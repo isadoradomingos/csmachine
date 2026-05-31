@@ -490,7 +490,7 @@ export default function LoginPage() {
               </form>
 
               <div className="lr-fade lr-footer">
-                Acesso restrito · CS Machine © {new Date().getFullYear()}
+                Machine · Acesso restrito © {new Date().getFullYear()}
               </div>
             </>
           )}

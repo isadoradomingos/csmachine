@@ -70,7 +70,7 @@ old_stats = '''          <div className="lr-stats">
           </div>'''
 
 new_stats = '''          <p style={{fontSize:12,color:"rgba(255,255,255,0.2)",position:"relative",zIndex:2}}>
-            © {new Date().getFullYear()} Machine · Acesso restrito
+            Machine · Acesso restrito © {new Date().getFullYear()}
           </p>'''
 
 content = content.replace(old_stats, new_stats)

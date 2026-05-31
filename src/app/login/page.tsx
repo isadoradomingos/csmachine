@@ -398,7 +398,7 @@ export default function LoginPage() {
           </div>
 
           <p style={{fontSize:12,color:"rgba(255,255,255,0.2)",position:"relative",zIndex:2}}>
-            © {new Date().getFullYear()} Machine · Acesso restrito
+            Machine · Acesso restrito © {new Date().getFullYear()} 
           </p>
         </div>
 
@@ -453,7 +453,7 @@ export default function LoginPage() {
               </form>
 
               <div className="lr-fade lr-footer">
-                Acesso restrito · CS Machine © {new Date().getFullYear()}
+                Machine · Acesso restrito © {new Date().getFullYear()}
               </div>
             </>
           )}
