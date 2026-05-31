@@ -389,7 +389,7 @@ export default function LoginPage() {
           <div className="lr-hero">
             <p className="lr-eyebrow">Portal interno</p>
             <h1 className="lr-headline">
-              CS<br/>
+              Customer success<br/>
               <span className="accent-r">Ma</span><span className="accent-y">chi</span><span className="accent-b">ne</span>
             </h1>
             <p className="lr-desc">
