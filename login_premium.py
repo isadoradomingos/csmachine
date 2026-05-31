@@ -406,7 +406,7 @@ export default function LoginPage() {
               <span className="accent-r">Ma</span><span className="accent-y">chi</span><span className="accent-b">ne</span>
             </h1>
             <p className="lr-desc">
-              Sua central de gestão de clientes, consultorias e relacionamento com parceiros de mobilidade.
+              Sua central de gestão de clientes.
             </p>
           </div>
 
