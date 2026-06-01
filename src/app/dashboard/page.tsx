@@ -201,7 +201,7 @@ export default function DashboardPage() {
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
-          <span className="text-lg font-semibold text-gray-900">CS Machine</span>
+          <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{profile?.full_name}</span>
