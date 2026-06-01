@@ -382,7 +382,7 @@ export default function LoginPage() {
           </svg>
 
           <div className="lr-logo">
-            <img src="/machine-logo.png" alt="Machine" className="lr-logo-icon" style={{filter: "brightness(0) invert(1)"}} />
+            <img src="/machine-logo.png" alt="Machine" className="lr-logo-icon" />
             <span className="lr-logo-name">Machine</span>
           </div>
 
