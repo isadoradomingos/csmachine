@@ -1,4 +1,4 @@
-"use client";
+content = '''"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -256,3 +256,8 @@ export default function AdminPage() {
     </div>
   );
 }
+'''
+
+with open("src/app/admin/page.tsx", "w") as f:
+    f.write(content)
+print("Admin page reescrita!")
