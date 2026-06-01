@@ -134,7 +134,13 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-end gap-3 mb-4">
+          <button
+            onClick={() => router.push("/admin/usuarios")}
+            className="text-sm border border-gray-200 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            👥 Gerenciar usuários
+          </button>
           <button
             onClick={() => router.push("/admin/importar")}
             className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
