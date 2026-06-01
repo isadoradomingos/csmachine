@@ -11,10 +11,33 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetStatus, setResetStatus] = useState<"idle" | "success" | "notfound" | "loading">("idle");
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault();
+    setResetStatus("loading");
+
+    // Verificar se o e-mail existe usando função segura do banco
+    const { data: exists } = await supabase
+      .rpc("check_email_exists", { email_input: resetEmail });
+
+    if (!exists) {
+      setResetStatus("notfound");
+      return;
+    }
+
+    await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    setResetStatus("success");
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -416,6 +439,43 @@ export default function LoginPage() {
                 <p className="lr-form-sub">Entre com suas credenciais para acessar</p>
               </div>
 
+              {resetMode ? (
+                <div>
+                  {resetStatus === "success" ? (
+                    <div style={{padding:"24px",background:"#f0fdf4",border:"1.5px solid #bbf7d0",borderRadius:12,textAlign:"center"}}>
+                      <p style={{fontSize:14,color:"#166534",fontWeight:600,marginBottom:8}}>E-mail enviado!</p>
+                      <p style={{fontSize:13,color:"#166534"}}>Verifique sua caixa de entrada e siga as instruções para redefinir sua senha.</p>
+                      <button onClick={() => { setResetMode(false); setResetStatus("idle"); }} style={{marginTop:16,fontSize:13,color:"#aaa",background:"none",border:"none",cursor:"pointer",fontFamily:"Montserrat, sans-serif"}}>← Voltar ao login</button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleReset}>
+                      <p style={{fontSize:14,color:"#888",marginBottom:24,lineHeight:1.6}}>Digite seu e-mail e enviaremos um link para redefinir sua senha.</p>
+                      <div className="lr-field">
+                        <label className="lr-label">E-mail</label>
+                        <input
+                          type="email"
+                          className="lr-input"
+                          value={resetEmail}
+                          onChange={e => setResetEmail(e.target.value)}
+                          placeholder="seu@email.com"
+                          required
+                        />
+                      </div>
+                      {resetStatus === "notfound" && (
+                        <div style={{padding:"12px 16px",background:"#fff5f5",border:"1px solid #ffdede",borderRadius:10,marginBottom:16,fontSize:13,color:"#b91c1c",lineHeight:1.6}}>
+                          Este e-mail não está cadastrado na plataforma. Entre em contato com um administrador para solicitar acesso.
+                        </div>
+                      )}
+                      <button type="submit" className="lr-btn" disabled={resetStatus === "loading"}>
+                        {resetStatus === "loading" ? "Enviando..." : "Enviar link →"}
+                      </button>
+                      <div style={{textAlign:"center",marginTop:16}}>
+                        <button type="button" onClick={() => { setResetMode(false); setResetStatus("idle"); }} style={{fontSize:13,color:"#aaa",background:"none",border:"none",cursor:"pointer",fontFamily:"Montserrat, sans-serif"}}>← Voltar ao login</button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              ) : (
               <form onSubmit={handleLogin}>
                 <div className="lr-fade lr-field">
                   <label className="lr-label">E-mail</label>
@@ -450,7 +510,18 @@ export default function LoginPage() {
                     {loading ? "Entrando..." : "Entrar →"}
                   </button>
                 </div>
+
+                <div className="lr-fade" style={{textAlign:"center", marginTop:16}}>
+                  <button
+                    type="button"
+                    onClick={() => { setResetMode(true); setResetStatus("idle"); setResetEmail(""); }}
+                    style={{fontSize:13,color:"#aaa",background:"none",border:"none",cursor:"pointer",fontFamily:"Montserrat, sans-serif",fontWeight:500}}
+                  >
+                    Esqueci minha senha
+                  </button>
+                </div>
               </form>
+              )}
 
               <div className="lr-fade lr-footer">
                 Machine · Acesso restrito © {new Date().getFullYear()}
