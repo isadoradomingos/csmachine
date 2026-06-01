@@ -10,6 +10,10 @@ const montserrat = Montserrat({
 export const metadata: Metadata = {
   title: "CS Machine",
   description: "CRM interno CS Machine",
+  icons: {
+    icon: "/machine-logo.png",
+    apple: "/machine-logo.png",
+  },
 };
 
 export default function RootLayout({
