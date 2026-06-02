@@ -17,7 +17,9 @@ export default function AdminUsuarioPage() {
   const [filterCluster, setFilterCluster] = useState("");
   const [followUpCount, setFollowUpCount] = useState(0);
   const [semRetornoCount, setSemRetornoCount] = useState(0);
+  const [semRetornoClients, setSemRetornoClients] = useState<any[]>([]);
   const [showEdit, setShowEdit] = useState(false);
+  const [modal, setModal] = useState<{ title: string; clients: any[] } | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", monthly_goal: 49, hasMeta: true, role: "csm" });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -90,6 +92,16 @@ export default function AdminUsuarioPage() {
       if (tentativasApos.length >= 3) semRetorno++;
     });
     setSemRetornoCount(semRetorno);
+
+    const semRetornoList = (clients ?? []).filter((client: any) => {
+      const contatos = clientContactsMap[client.id] ?? [];
+      const ultimoEfetivo = contatos.find((c: any) => c.type === "efetivo" || c.type === "consultoria_produto");
+      const tentativasApos = ultimoEfetivo
+        ? contatos.filter((c: any) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
+        : contatos.filter((c: any) => c.type === "tentativa");
+      return tentativasApos.length >= 3;
+    });
+    setSemRetornoClients(semRetornoList);
 
     setLoading(false);
   }, [id, router]);
@@ -236,7 +248,10 @@ export default function AdminUsuarioPage() {
 
         {/* Cards indicadores */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+          <div
+            onClick={() => setModal({ title: "Oportunidades de follow-up", clients: clients.filter(c => daysSince(c.last_contact) > 20).map(c => ({ ...c, daysSinceContact: daysSince(c.last_contact) })) })}
+            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
+          >
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm text-gray-500">Oportunidades de follow-up</p>
               <span className="text-yellow-400">
@@ -249,7 +264,10 @@ export default function AdminUsuarioPage() {
             <p className="text-xs text-gray-400 mt-1">clientes sem contato há mais de 20 dias</p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+          <div
+            onClick={() => setModal({ title: "Tentativas sem retorno", clients: semRetornoClients })}
+            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
+          >
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm text-gray-500">Tentativas sem retorno</p>
               <span className="text-red-400">
@@ -316,6 +334,38 @@ export default function AdminUsuarioPage() {
           )}
         </div>
       </main>
+
+      {/* Modal de clientes */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">{modal.title}</h3>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400">{modal.clients.length} clientes</span>
+                <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
+              </div>
+            </div>
+            <ul className="divide-y divide-gray-100 overflow-y-auto flex-1">
+              {modal.clients.length === 0 ? (
+                <li className="px-6 py-8 text-center text-sm text-gray-400">Nenhum cliente nesta categoria.</li>
+              ) : modal.clients.map(c => (
+                <li key={c.id} onClick={() => { setModal(null); router.push(`/clients/${c.id}`); }} className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">{c.marca}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Bandeira {c.bandeira} · {c.last_contact ? `último contato há ${daysSince(c.last_contact)} dias` : "sem contato registrado"}
+                      </p>
+                    </div>
+                    <span className="text-xs text-gray-400">→</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* Modal editar usuário */}
       {showEdit && (

@@ -131,15 +131,26 @@ export default function AdminPage() {
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={() => router.push("/admin/importar")} className="text-sm border border-gray-200 bg-white text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">↑ Importar planilha</button>
+
           <button onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }} className="text-sm text-red-500 hover:text-red-700">Sair</button>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
-        <div className="mb-8">
-          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Administração</p>
-          <h2 className="text-2xl font-semibold text-gray-900 mt-1">Visão geral do time</h2>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Administração</p>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-1">Visão geral do time</h2>
+          </div>
+          <button
+            onClick={() => router.push("/admin/importar")}
+            className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
+            style={{ background: "#16a34a", color: "white" }}
+            onMouseOver={e => (e.currentTarget.style.background = "#15803d")}
+            onMouseOut={e => (e.currentTarget.style.background = "#16a34a")}
+          >
+            ↑ Importar planilha
+          </button>
         </div>
 
         {/* Cards gerais */}
