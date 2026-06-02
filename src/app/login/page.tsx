@@ -33,7 +33,7 @@ export default function LoginPage() {
     }
 
     await supabase.auth.resetPasswordForEmail(resetEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: "https://csmachine.vercel.app/reset-password",
     });
 
     setResetStatus("success");
