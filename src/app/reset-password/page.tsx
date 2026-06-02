@@ -32,8 +32,13 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres.");
+    if (password.length < 8) {
+      setError("A senha deve ter pelo menos 8 caracteres.");
+      return;
+    }
+
+    if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      setError("A senha deve conter letras e números.");
       return;
     }
 
@@ -48,7 +53,8 @@ export default function ResetPasswordPage() {
     }
 
     setStatus("success");
-    setTimeout(() => router.push("/dashboard"), 3000);
+    await supabase.auth.signOut();
+    setTimeout(() => router.push("/login"), 3000);
   }
 
   return (
@@ -79,7 +85,7 @@ export default function ResetPasswordPage() {
             <div style={{ textAlign: "center", padding: "16px 0" }}>
               <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111", marginBottom: 8 }}>Senha redefinida!</h2>
-              <p style={{ fontSize: 14, color: "#aaa" }}>Você será redirecionado em instantes...</p>
+              <p style={{ fontSize: 14, color: "#aaa" }}>Você será redirecionado para o login em instantes...</p>
             </div>
           ) : !ready ? (
             <div style={{ textAlign: "center", padding: "16px 0" }}>
@@ -101,6 +107,7 @@ export default function ResetPasswordPage() {
                     placeholder="••••••••"
                     style={{ width: "100%", padding: "13px 16px", border: "1.5px solid #ebebeb", borderRadius: 10, fontSize: 14, fontFamily: "Montserrat, sans-serif", outline: "none", background: "#fafafa" }}
                   />
+                  <p style={{ fontSize: 11, color: "#bbb", marginTop: 6 }}>Mínimo 8 caracteres, com letras e números</p>
                 </div>
 
                 <div style={{ marginBottom: 20 }}>
