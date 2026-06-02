@@ -22,7 +22,7 @@ export default function AdminUsuarioPage() {
   const [modal, setModal] = useState<{ title: string; clients: any[] } | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", monthly_goal: 49, hasMeta: true, role: "csm" });
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+
 
   function daysSince(date: string | null): number {
     if (!date) return 999;
@@ -121,9 +121,13 @@ export default function AdminUsuarioPage() {
 
     // Atualizar roles
     await supabase.from("user_roles").delete().eq("user_id", id);
-    await supabase.from("user_roles").insert({ user_id: id, role: editForm.role });
-    if (editForm.role === "csm" && roles.includes("admin")) {
-      await supabase.from("user_roles").insert({ user_id: id, role: "admin" });
+    if (editForm.role === "csm_admin") {
+      await supabase.from("user_roles").insert([
+        { user_id: id, role: "csm" },
+        { user_id: id, role: "admin" },
+      ]);
+    } else {
+      await supabase.from("user_roles").insert({ user_id: id, role: editForm.role });
     }
 
     setSaving(false);
@@ -131,21 +135,20 @@ export default function AdminUsuarioPage() {
     await load();
   }
 
-  async function handleDelete() {
-    if (!confirm(`Tem certeza que deseja remover o acesso de ${profile?.full_name}? Esta ação não pode ser desfeita.`)) return;
-    setDeleting(true);
+  async function handleToggleAtivo(desativar: boolean) {
+    const msg = desativar
+      ? `Desativar ${profile?.full_name}? O acesso será bloqueado e os clientes ficarão sem CSM.`
+      : `Reativar ${profile?.full_name}? O acesso será restaurado mas a carteira estará vazia.`;
+    if (!confirm(msg)) return;
 
-    const res = await fetch("/api/delete-user", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: id }),
-    });
+    await supabase.from("profiles").update({ ativo: !desativar }).eq("id", id);
 
-    if (res.ok) {
-      router.push("/admin");
-    } else {
-      setDeleting(false);
+    if (desativar) {
+      // Remover csm_id dos clientes
+      await supabase.from("clients").update({ csm_id: null }).eq("csm_id", id);
     }
+
+    await load();
   }
 
   const filtered = clients.filter(c => {
@@ -205,25 +208,29 @@ export default function AdminUsuarioPage() {
                       {roleLabel(r)}
                     </span>
                   ))}
+                  {profile?.ativo === false && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">
+                      Inativo
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-gray-400 mt-0.5">{clients.length} clientes na carteira</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowEdit(true)}
-                className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50"
-              >
-                Editar
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-xs border border-red-200 text-red-500 px-3 py-1.5 rounded-lg hover:bg-red-50 disabled:opacity-50"
-              >
-                {deleting ? "Removendo..." : "Remover acesso"}
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setEditForm({
+                  full_name: profile?.full_name ?? "",
+                  monthly_goal: profile?.monthly_goal ?? 49,
+                  hasMeta: profile?.monthly_goal != null,
+                  role: roles.includes("admin") && roles.includes("csm") ? "csm_admin" : roles[0] ?? "csm",
+                });
+                setShowEdit(true);
+              }}
+              className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50"
+            >
+              Editar
+            </button>
           </div>
 
           {/* Barra de progresso — só se tiver meta */}
@@ -377,7 +384,7 @@ export default function AdminUsuarioPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Nome completo</label>
                 <input
                   type="text"
-                  value={editForm.full_name || profile?.full_name}
+                  value={editForm.full_name}
                   onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
                   required
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -386,7 +393,7 @@ export default function AdminUsuarioPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Perfil</label>
                 <select
-                  value={editForm.role || roles[0]}
+                  value={editForm.role}
                   onChange={e => setEditForm({ ...editForm, role: e.target.value })}
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
@@ -403,22 +410,44 @@ export default function AdminUsuarioPage() {
                     onChange={e => setEditForm({ ...editForm, hasMeta: e.target.checked })}
                     className="rounded"
                   />
-                  Possui meta mensal
+                  Possui meta mensal de contatos
                 </label>
                 {editForm.hasMeta && (
                   <input
                     type="number"
-                    value={editForm.monthly_goal || profile?.monthly_goal || 49}
+                    value={editForm.monthly_goal}
                     onChange={e => setEditForm({ ...editForm, monthly_goal: parseInt(e.target.value) })}
                     className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 )}
               </div>
+
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowEdit(false)} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
                 <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
                   {saving ? "Salvando..." : "Salvar"}
                 </button>
+              </div>
+
+              {/* Botão desativar/reativar */}
+              <div className="pt-2 border-t border-gray-100">
+                {profile?.ativo !== false ? (
+                  <button
+                    type="button"
+                    onClick={() => { setShowEdit(false); handleToggleAtivo(true); }}
+                    className="w-full rounded-lg border border-red-200 text-red-500 px-4 py-2 text-sm hover:bg-red-50 transition-colors"
+                  >
+                    Desativar usuário
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setShowEdit(false); handleToggleAtivo(false); }}
+                    className="w-full rounded-lg border border-green-200 text-green-600 px-4 py-2 text-sm hover:bg-green-50 transition-colors"
+                  >
+                    Reativar usuário
+                  </button>
+                )}
               </div>
             </form>
           </div>
