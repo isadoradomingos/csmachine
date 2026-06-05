@@ -343,7 +343,7 @@ export default function AdminUsuarioPage() {
               <option value="no_touch">No Touch</option>
             </select>
             <select value={sortOrder} onChange={e => setSortOrder(e.target.value as any)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none">
-              <option value="">Ordenar por nome</option>
+              <option value="">Ordem de contato</option>
               <option value="recente">Contato mais recente</option>
               <option value="antigo">Contato mais antigo</option>
             </select>
