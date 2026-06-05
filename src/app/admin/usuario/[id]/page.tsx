@@ -15,6 +15,7 @@ export default function AdminUsuarioPage() {
   const [search, setSearch] = useState("");
   const [filterOperacao, setFilterOperacao] = useState("");
   const [filterCluster, setFilterCluster] = useState("");
+  const [sortOrder, setSortOrder] = useState<"" | "recente" | "antigo">("");
   const [followUpCount, setFollowUpCount] = useState(0);
   const [semRetornoCount, setSemRetornoCount] = useState(0);
   const [semRetornoClients, setSemRetornoClients] = useState<any[]>([]);
@@ -172,12 +173,18 @@ export default function AdminUsuarioPage() {
     await load();
   }
 
-  const filtered = clients.filter(c => {
-    const matchSearch = c.marca.toLowerCase().includes(search.toLowerCase()) || c.bandeira?.includes(search);
-    const matchOperacao = filterOperacao ? c.operacao === filterOperacao : true;
-    const matchCluster = filterCluster ? c.cluster === filterCluster : true;
-    return matchSearch && matchOperacao && matchCluster;
-  });
+  const filtered = clients
+    .filter(c => {
+      const matchSearch = c.marca.toLowerCase().includes(search.toLowerCase()) || c.bandeira?.includes(search);
+      const matchOperacao = filterOperacao ? c.operacao === filterOperacao : true;
+      const matchCluster = filterCluster ? c.cluster === filterCluster : true;
+      return matchSearch && matchOperacao && matchCluster;
+    })
+    .sort((a, b) => {
+      if (sortOrder === "recente") return daysSince(a.last_contact) - daysSince(b.last_contact);
+      if (sortOrder === "antigo") return daysSince(b.last_contact) - daysSince(a.last_contact);
+      return 0;
+    });
 
   const clusterLabel: Record<string, string> = {
     high_touch: "High Touch",
@@ -334,6 +341,11 @@ export default function AdminUsuarioPage() {
               <option value="mid_touch">Mid Touch</option>
               <option value="growth_touch">Growth Touch</option>
               <option value="no_touch">No Touch</option>
+            </select>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as any)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none">
+              <option value="">Ordenar por nome</option>
+              <option value="recente">Contato mais recente</option>
+              <option value="antigo">Contato mais antigo</option>
             </select>
           </div>
           <div className="px-6 py-2 border-b border-gray-100">

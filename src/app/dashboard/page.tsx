@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [filterOperacao, setFilterOperacao] = useState("");
   const [filterCluster, setFilterCluster] = useState("");
+  const [sortOrder, setSortOrder] = useState<"" | "recente" | "antigo">("");
   const [contactCount, setContactCount] = useState(0);
   const [tentativasMap, setTentativasMap] = useState<Record<string, number>>({});
   const [consultoriasSet, setConsultoriasSet] = useState<Set<string>>(new Set());
@@ -154,12 +155,18 @@ export default function DashboardPage() {
     .filter(c => daysSince(c.last_contact) > 20)
     .map(c => ({ ...c, daysSinceContact: daysSince(c.last_contact) }));
 
-  const filtered = clients.filter(c => {
-    const matchSearch = c.marca.toLowerCase().includes(search.toLowerCase()) || c.bandeira?.includes(search);
-    const matchOperacao = filterOperacao ? c.operacao === filterOperacao : true;
-    const matchCluster = filterCluster ? c.cluster === filterCluster : true;
-    return matchSearch && matchOperacao && matchCluster;
-  });
+  const filtered = clients
+    .filter(c => {
+      const matchSearch = c.marca.toLowerCase().includes(search.toLowerCase()) || c.bandeira?.includes(search);
+      const matchOperacao = filterOperacao ? c.operacao === filterOperacao : true;
+      const matchCluster = filterCluster ? c.cluster === filterCluster : true;
+      return matchSearch && matchOperacao && matchCluster;
+    })
+    .sort((a, b) => {
+      if (sortOrder === "recente") return daysSince(a.last_contact) - daysSince(b.last_contact);
+      if (sortOrder === "antigo") return daysSince(b.last_contact) - daysSince(a.last_contact);
+      return 0;
+    });
 
   const clusterLabel: Record<string, string> = {
     high_touch: "High Touch",
@@ -274,6 +281,11 @@ export default function DashboardPage() {
             <option value="mid_touch">Mid Touch</option>
             <option value="growth_touch">Growth Touch</option>
             <option value="no_touch">No Touch</option>
+          </select>
+          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as any)} className="rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+            <option value="">Ordenar por nome</option>
+            <option value="recente">Contato mais recente</option>
+            <option value="antigo">Contato mais antigo</option>
           </select>
         </div>
 
