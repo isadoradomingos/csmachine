@@ -206,7 +206,7 @@ export default function AdminPage() {
             <p className="text-3xl font-semibold text-gray-900">{stats.totalClients}</p>
           </div>
           <div onClick={() => { setContatoFilterCSM(""); setActiveModal("contatos"); }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
-            <p className="text-xs text-gray-400 mb-2">Contatos no mês</p>
+            <p className="text-xs text-gray-400 mb-2">Consultorias de Produto no mês</p>
             <p className="text-3xl font-semibold text-gray-900">{stats.totalContacts}</p>
           </div>
           <div onClick={() => setActiveModal("meta")} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
@@ -328,7 +328,7 @@ export default function AdminPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setActiveModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Contatos no mês</h3>
+              <h3 className="font-semibold text-gray-900">Consultorias de Produto no mês</h3>
               <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
             </div>
             <div className="px-6 py-3 border-b border-gray-100">
@@ -345,7 +345,7 @@ export default function AdminPage() {
             </div>
             <div className="px-6 py-2 border-b border-gray-100">
               <span className="text-xs text-gray-400">
-                {contatosList.filter((c: any) => !contatoFilterCSM || c.clients?.csm_id === contatoFilterCSM).length} consultorias realizadas
+                {contatosList.filter((c: any) => !contatoFilterCSM || c.clients?.csm_id === contatoFilterCSM).length} consultorias de produto realizadas
               </span>
             </div>
             <ul className="divide-y divide-gray-100 overflow-y-auto flex-1">

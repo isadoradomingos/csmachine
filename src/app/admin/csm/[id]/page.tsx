@@ -134,7 +134,7 @@ export default function AdminCsmPage() {
                 <div className="flex items-center gap-2">
                   <div className="text-right">
                     <p className="text-xs text-gray-400">Meta mensal</p>
-                    <p className="text-lg font-semibold text-gray-900">{profile?.monthly_goal} contatos</p>
+                    <p className="text-lg font-semibold text-gray-900">{profile?.monthly_goal} consultorias de produto</p>
                   </div>
                   <button
                     onClick={() => setEditingGoal(true)}
