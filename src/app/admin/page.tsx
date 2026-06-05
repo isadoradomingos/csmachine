@@ -89,13 +89,22 @@ export default function AdminPage() {
     });
 
     // Buscar todos os clientes ativos
-    const { data: allClientsData } = await supabase
-      .from("clients")
-      .select("id, marca, bandeira, operacao, csm_id")
-      .eq("status", "ativo")
-      .order("marca")
-      .limit(10000);
-    setAllClients(allClientsData ?? []);
+    // Buscar todos os clientes em batches de 1000
+    let allClientsData: any[] = [];
+    let from = 0;
+    while (true) {
+      const { data: batch } = await supabase
+        .from("clients")
+        .select("id, marca, bandeira, operacao, csm_id")
+        .eq("status", "ativo")
+        .order("marca")
+        .range(from, from + 999);
+      if (!batch || batch.length === 0) break;
+      allClientsData = [...allClientsData, ...batch];
+      if (batch.length < 1000) break;
+      from += 1000;
+    }
+    setAllClients(allClientsData);
 
     // Buscar contatos do mês por CSM
     const { data: contatosMes } = await supabase
