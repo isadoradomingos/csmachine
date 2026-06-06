@@ -225,7 +225,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Progresso mensal</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{contactCount} / {profile?.monthly_goal ?? 49} <span className="text-lg font-medium text-gray-500">contatos</span></p>
+            <p className="text-3xl font-bold text-gray-900 mt-1">{contactCount} / {profile?.monthly_goal ?? 49} <span className="text-lg font-medium text-gray-500">consultorias de produto</span></p>
           </div>
           <div className="mt-4 w-full bg-gray-100 rounded-full h-2 overflow-hidden">
             <div
