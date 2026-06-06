@@ -467,7 +467,7 @@ export default function ClientPage() {
                       onClick={() => setShowTentativaModal(true)}
                       className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
                     >
-                      Registrar tentativa
+                      Registrar tentativa de contato
                     </button>
                     <button
                       onClick={() => { setEditingContact(null); setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" }); setShowModal(true); }}
@@ -720,7 +720,7 @@ export default function ClientPage() {
             <div className="flex gap-3 mt-6">
               <button onClick={() => setShowTentativaModal(false)} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
               <button onClick={handleSaveTentativa} disabled={savingTentativa} className="flex-1 rounded-lg bg-gray-800 text-white px-4 py-2 text-sm font-medium hover:bg-gray-900 disabled:opacity-50">
-                {savingTentativa ? "Salvando..." : "Registrar tentativa"}
+                {savingTentativa ? "Salvando..." : "Registrar tentativa de contato"}
               </button>
             </div>
           </div>
