@@ -103,7 +103,7 @@ export default function DashboardPage() {
     const semHistorico = new Set((clients ?? []).map((c: any) => c.id).filter((id: string) => !comHistorico.has(id)));
     setSemHistoricoSet(semHistorico);
 
-    // Calcular clientes com 3+ tentativas sem retorno
+    // Calcular clientes com 3+ tentativas de contato sem retorno
     const { data: allContacts } = await supabase
       .from("client_contacts")
       .select("client_id, date, type")
@@ -225,7 +225,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-4">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Progresso mensal</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">{contactCount} / {profile?.monthly_goal ?? 49} <span className="text-lg font-medium text-gray-500">consultorias de produto</span></p>
+            <p className="text-3xl font-bold text-gray-900 mt-1">{contactCount} / {profile?.monthly_goal ?? 49} <span className="text-sm font-medium text-gray-400">consultorias de produto</span></p>
           </div>
           <div className="mt-4 w-full bg-gray-100 rounded-full h-2 overflow-hidden">
             <div
@@ -255,7 +255,7 @@ export default function DashboardPage() {
 
           <div onClick={() => setModal({ type: "semretorno" })} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500">Tentativas sem retorno</p>
+              <p className="text-sm text-gray-500">Tentativas de contato sem retorno</p>
               <span className="text-red-400">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -263,7 +263,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <p className="text-3xl font-semibold text-gray-900">{semRetornoClients.length}</p>
-            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas sem contato efetivo</p>
+            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas de contato sem retorno</p>
           </div>
         </div>
 
@@ -391,12 +391,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Modal tentativas sem retorno */}
+      {/* Modal Tentativas de contato sem retorno */}
       {modal?.type === "semretorno" && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Tentativas sem retorno</h3>
+              <h3 className="font-semibold text-gray-900">Tentativas de contato sem retorno</h3>
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-400">{semRetornoClients.length} clientes</span>
                 <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
@@ -411,7 +411,7 @@ export default function DashboardPage() {
                     <div>
                       <p className="font-medium text-gray-900 text-sm">{c.marca}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        Bandeira {c.bandeira} · {c.tentativasSemRetorno} tentativas sem retorno
+                        Bandeira {c.bandeira} · {c.tentativasSemRetorno} tentativas de contato sem retorno
                       </p>
                     </div>
                     <span className="text-xs text-gray-400">→</span>

@@ -81,7 +81,7 @@ export default function AdminUsuarioPage() {
     const followUp = (clients ?? []).filter((c: any) => daysSince(c.last_contact) > 20).length;
     setFollowUpCount(followUp);
 
-    // Calcular tentativas sem retorno
+    // Calcular Tentativas de contato sem retorno
     const { data: allContacts } = await supabase
       .from("client_contacts")
       .select("client_id, date, type")
@@ -267,7 +267,7 @@ export default function AdminUsuarioPage() {
             <div className="mt-5">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Progresso mensal</p>
-                <p className="text-sm font-semibold text-gray-900">{contactCount} / {profile?.monthly_goal} contatos</p>
+                <p className="text-sm font-semibold text-gray-900">{contactCount} / {profile?.monthly_goal} <span className="text-xs font-medium text-gray-400">consultorias de produto</span></p>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                 <div
@@ -301,11 +301,11 @@ export default function AdminUsuarioPage() {
           </div>
 
           <div
-            onClick={() => setModal({ title: "Tentativas sem retorno", clients: semRetornoClients })}
+            onClick={() => setModal({ title: "Tentativas de contato sem retorno", clients: semRetornoClients })}
             className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
           >
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500">Tentativas sem retorno</p>
+              <p className="text-sm text-gray-500">Tentativas de contato sem retorno</p>
               <span className="text-red-400">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -313,7 +313,7 @@ export default function AdminUsuarioPage() {
               </span>
             </div>
             <p className="text-3xl font-semibold text-gray-900">{semRetornoCount}</p>
-            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas sem contato efetivo</p>
+            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas de contato sem retorno</p>
           </div>
         </div>
 
@@ -414,7 +414,7 @@ export default function AdminUsuarioPage() {
             )}
 
             {/* Busca simples para tentativas */}
-            {modal.title === "Tentativas sem retorno" && (
+            {modal.title === "Tentativas de contato sem retorno" && (
               <div className="px-6 py-3 border-b border-gray-100">
                 <input
                   type="text"

@@ -83,7 +83,7 @@ new_modal = '''      {/* Modal de clientes */}
             )}
 
             {/* Busca simples para tentativas */}
-            {modal.title === "Tentativas sem retorno" && (
+            {modal.title === "Tentativas de contato sem retorno" && (
               <div className="px-6 py-3 border-b border-gray-100">
                 <input
                   type="text"

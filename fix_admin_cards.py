@@ -70,7 +70,7 @@ old_cards = '''        {/* Cards indicadores */}
 
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500">Tentativas sem retorno</p>
+              <p className="text-sm text-gray-500">Tentativas de contato sem retorno</p>
               <span className="text-red-400">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -78,7 +78,7 @@ old_cards = '''        {/* Cards indicadores */}
               </span>
             </div>
             <p className="text-3xl font-semibold text-gray-900">{semRetornoCount}</p>
-            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas sem contato efetivo</p>
+            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas de contato sem retorno</p>
           </div>
         </div>'''
 
@@ -106,12 +106,12 @@ new_cards = '''        {/* Cards indicadores */}
                 const contatos = (c as any)._contatos ?? [];
                 return contatos.length >= 3;
               });
-              setModal({ title: "Tentativas sem retorno", clients: semRetorno });
+              setModal({ title: "Tentativas de contato sem retorno", clients: semRetorno });
             }}
             className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
           >
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-500">Tentativas sem retorno</p>
+              <p className="text-sm text-gray-500">Tentativas de contato sem retorno</p>
               <span className="text-red-400">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -119,7 +119,7 @@ new_cards = '''        {/* Cards indicadores */}
               </span>
             </div>
             <p className="text-3xl font-semibold text-gray-900">{semRetornoCount}</p>
-            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas sem contato efetivo</p>
+            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas de contato sem retorno</p>
           </div>
         </div>'''
 
@@ -159,10 +159,10 @@ old_tentativas_click = '''            onClick={() => {
                 const contatos = (c as any)._contatos ?? [];
                 return contatos.length >= 3;
               });
-              setModal({ title: "Tentativas sem retorno", clients: semRetorno });
+              setModal({ title: "Tentativas de contato sem retorno", clients: semRetorno });
             }}'''
 
-new_tentativas_click = '''            onClick={() => setModal({ title: "Tentativas sem retorno", clients: semRetornoClients })}'''
+new_tentativas_click = '''            onClick={() => setModal({ title: "Tentativas de contato sem retorno", clients: semRetornoClients })}'''
 
 content = content.replace(old_tentativas_click, new_tentativas_click)
 
