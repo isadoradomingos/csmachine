@@ -267,7 +267,7 @@ export default function AdminUsuarioPage() {
             <div className="mt-5">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Progresso mensal</p>
-                <p className="text-sm font-semibold text-gray-900">{contactCount} / {profile?.monthly_goal} <span className="text-xs font-medium text-gray-400">consultorias de produto</span></p>
+                <p className="text-sm font-semibold text-gray-900">{contactCount} / {profile?.monthly_goal} <span className="text-xs font-medium text-gray-900">consultorias de produto</span></p>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                 <div
