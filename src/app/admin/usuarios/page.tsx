@@ -136,8 +136,8 @@ export default function UsuariosPage() {
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-400">Administração</p>
-            <h2 className="text-2xl font-semibold text-gray-900 mt-1">Gerenciar usuários</h2>
+            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Administração</p>
+            <h2 className="text-2xl font-semibold text-white mt-1">Gerenciar usuários</h2>
           </div>
           <button
             onClick={() => { setShowInvite(true); setInviteStatus("idle"); }}
