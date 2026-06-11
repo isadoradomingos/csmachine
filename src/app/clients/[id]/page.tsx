@@ -1,511 +1,190 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
-import { Info } from "lucide-react";
 
-type Contact = {
-  id: string;
-  date: string;
-  type: "tentativa" | "efetivo" | "consultoria_produto";
-  note: string;
-  canal: string;
-};
-
-type Feature = {
-  id: string;
-  nome: string;
-  categoria: string | null;
-  ordem: number;
-  operacao: string | null;
-  link: string | null;
-};
-
-type ClientDiagnostico = {
-  feature_id: string;
-  ativo: boolean;
-};
-
-type AuditLog = {
-  id: string;
-  action: string;
-  entity: string;
-  field: string | null;
-  old_value: string | null;
-  new_value: string | null;
-  created_at: string;
-  profiles: { full_name: string };
-};
-
-function escapeHtml(text: string) {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function isHtmlNote(note: string) {
-  return /<[a-z][\s\S]*>/i.test(note);
-}
-
-function noteIsEmpty(html: string) {
-  return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim() === "";
-}
-
-function sanitizeNote(html: string): string {
-  if (typeof window === "undefined") return "";
-  const allowed = new Set(["B", "STRONG", "U", "I", "EM", "UL", "OL", "LI", "BR", "P", "DIV", "SPAN"]);
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  const clean = (node: Node): string => {
-    if (node.nodeType === Node.TEXT_NODE) return escapeHtml(node.textContent ?? "");
-    if (node.nodeType !== Node.ELEMENT_NODE) return "";
-    const el = node as Element;
-    const children = Array.from(el.childNodes).map(clean).join("");
-    if (!allowed.has(el.tagName)) return children;
-    const tag = el.tagName.toLowerCase();
-    if (tag === "br") return "<br>";
-    return `<${tag}>${children}</${tag}>`;
-  };
-  return Array.from(doc.body.childNodes).map(clean).join("");
-}
-
-function RichTextEditor({ initialValue, onChange, placeholder }: { initialValue: string; onChange: (html: string) => void; placeholder?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.innerHTML = isHtmlNote(initialValue)
-        ? sanitizeNote(initialValue)
-        : escapeHtml(initialValue).replace(/\n/g, "<br>");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function emit() {
-    if (ref.current) onChange(ref.current.innerHTML);
-  }
-
-  function exec(command: string) {
-    ref.current?.focus();
-    document.execCommand(command);
-    emit();
-  }
-
-  function closestLi(node: Node | null): HTMLElement | null {
-    let cur: Node | null = node;
-    while (cur && cur !== ref.current) {
-      if (cur.nodeType === Node.ELEMENT_NODE && (cur as Element).tagName === "LI") return cur as HTMLElement;
-      cur = cur.parentNode;
-    }
-    return null;
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const li = closestLi(sel.anchorNode);
-
-    // Tab dentro de um tópico → subtópico | Shift+Tab → volta um nível
-    if (e.key === "Tab") {
-      if (li) {
-        e.preventDefault();
-        document.execCommand(e.shiftKey ? "outdent" : "indent");
-        emit();
-      }
-      return;
-    }
-
-    // Backspace em tópico vazio → remove a bolinha e vira linha normal
-    if (e.key === "Backspace") {
-      if (li && sel.isCollapsed && (li.textContent ?? "").trim() === "") {
-        e.preventDefault();
-        document.execCommand("outdent");
-        emit();
-      }
-      return;
-    }
-
-    // "-" + espaço no início da linha → vira tópico automaticamente
-    if (e.key === " " && !li && sel.isCollapsed) {
-      const node = sel.anchorNode;
-      if (
-        node &&
-        node.nodeType === Node.TEXT_NODE &&
-        sel.anchorOffset === 1 &&
-        (node.textContent ?? "").startsWith("-") &&
-        !node.previousSibling
-      ) {
-        e.preventDefault();
-        const range = document.createRange();
-        range.setStart(node, 0);
-        range.setEnd(node, 1);
-        range.deleteContents();
-        document.execCommand("insertUnorderedList");
-        emit();
-      }
-    }
-  }
-
-  const btn = "px-2.5 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 transition-colors";
-
-  return (
-    <div>
-      <div className="flex gap-1.5 mb-1.5">
-        <button type="button" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} className={`${btn} font-bold`} title="Negrito (Ctrl+B)">B</button>
-        <button type="button" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} className={`${btn} italic`} title="Itálico (Ctrl+I)">I</button>
-        <button type="button" onMouseDown={(e) => { e.preventDefault(); exec("underline"); }} className={`${btn} underline`} title="Sublinhado (Ctrl+U)">U</button>
-        <span className="text-[11px] text-gray-400 self-center ml-1">dica: &quot;-&quot; + espaço cria tópicos</span>
-      </div>
-      <div
-        ref={ref}
-        contentEditable
-        onInput={emit}
-        onKeyDown={handleKeyDown}
-        data-placeholder={placeholder}
-        className="w-full min-h-24 max-h-60 overflow-y-auto rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_ul]:list-[circle] [&_ol]:list-decimal [&_ol]:pl-5 empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 empty:before:pointer-events-none"
-      />
-    </div>
-  );
-}
-
-function ContactNote({ note }: { note: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const [clamped, setClamped] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (el) setClamped(el.scrollHeight > el.clientHeight + 1);
-  }, [note]);
-
-  return (
-    <div className="mt-2">
-      {isHtmlNote(note) ? (
-        <div
-          ref={ref}
-          dangerouslySetInnerHTML={{ __html: sanitizeNote(note) }}
-          className={`text-sm text-gray-700 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_ul]:list-[circle] [&_ol]:list-decimal [&_ol]:pl-5 ${expanded ? "" : "line-clamp-5"}`}
-        />
-      ) : (
-        <div
-          ref={ref}
-          className={`text-sm text-gray-700 whitespace-pre-wrap ${expanded ? "" : "line-clamp-5"}`}
-        >
-          {note}
-        </div>
-      )}
-      {(clamped || expanded) && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-xs text-blue-500 hover:text-blue-700 mt-1 font-medium"
-        >
-          {expanded ? "ver menos" : "ver mais"}
-        </button>
-      )}
-    </div>
-  );
-}
-
-export default function ClientPage() {
+export default function AdminUsuarioPage() {
   const router = useRouter();
   const { id } = useParams();
-  const [client, setClient] = useState<any>(null);
-  const [csm, setCsm] = useState<any>(null);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [audit, setAudit] = useState<AuditLog[]>([]);
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [diagnostico, setDiagnostico] = useState<Record<string, boolean>>({});
-  const [percepcoes, setPercepcoes] = useState("");
-  const [savingPercepcoes, setSavingPercepcoes] = useState(false);
-  const [editingPercepcoes, setEditingPercepcoes] = useState(false);
-  const [savedPercepcoes, setSavedPercepcoes] = useState("");
-  const [observacoes, setObservacoes] = useState("");
-  const [savingObservacoes, setSavingObservacoes] = useState(false);
-  const [editingObservacoes, setEditingObservacoes] = useState(false);
-  const [savedObservacoes, setSavedObservacoes] = useState("");
+  const [profile, setProfile] = useState<any>(null);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [contactCount, setContactCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterOperacao, setFilterOperacao] = useState("");
+  const [filterCluster, setFilterCluster] = useState("");
+  const [sortOrder, setSortOrder] = useState<"" | "recente" | "antigo">("");
+  const [followUpCount, setFollowUpCount] = useState(0);
+  const [semRetornoCount, setSemRetornoCount] = useState(0);
+  const [semRetornoClients, setSemRetornoClients] = useState<any[]>([]);
+  const [showEdit, setShowEdit] = useState(false);
+  const [modal, setModal] = useState<{ title: string; clients: any[] } | null>(null);
+  const [modalSearch, setModalSearch] = useState("");
+  const [modalOrder, setModalOrder] = useState<"asc" | "desc">("desc");
+  const [modalFilterType, setModalFilterType] = useState<"mais" | "menos" | "entre">("mais");
+  const [modalFilterDays, setModalFilterDays] = useState("");
+  const [modalFilterDays2, setModalFilterDays2] = useState("");
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", monthly_goal: 49, hasMeta: true, role: "csm" });
+  const [userEmail, setUserEmail] = useState("");
   const [saving, setSaving] = useState(false);
-  const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [activeTab, setActiveTab] = useState<"contatos" | "diagnostico" | "historico">("contatos");
-  const [openInfoId, setOpenInfoId] = useState<string | null>(null);
-  const [auditLimit, setAuditLimit] = useState(10);
-  const [form, setForm] = useState({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" });
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [showTentativaModal, setShowTentativaModal] = useState(false);
-  const [tentativaForm, setTentativaForm] = useState({ date: new Date().toISOString().split("T")[0], canal: "whatsapp", note: "" });
-  const [savingTentativa, setSavingTentativa] = useState(false);
 
-  async function loadContacts() {
-    const { data } = await supabase
-      .from("client_contacts")
-      .select("*")
-      .eq("client_id", id)
-      .order("date", { ascending: false });
-    setContacts(data ?? []);
+
+  function daysSince(date: string | null): number {
+    if (!date) return 999;
+    return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
   }
 
-  async function loadAudit() {
-    const { data } = await supabase
-      .from("client_audit")
-      .select("*")
-      .eq("client_id", id)
-      .order("created_at", { ascending: false });
-
-    if (data && data.length > 0) {
-      const userIds = [...new Set(data.map((d: any) => d.user_id))];
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("id, full_name")
-        .in("id", userIds);
-      const profileMap = Object.fromEntries((profilesData ?? []).map((p: any) => [p.id, p]));
-      setAudit(data.map((d: any) => ({ ...d, profiles: profileMap[d.user_id] ?? null })));
-    } else {
-      setAudit([]);
-    }
-  }
-
-  async function loadDiagnostico() {
-    const { data: featuresData } = await supabase
-      .from("features")
-      .select("*")
-      .eq("ativo", true)
-      .order("ordem");
-    setFeatures(featuresData ?? []);
-
-    const { data: diagData } = await supabase
-      .from("client_diagnostico")
-      .select("feature_id, ativo")
-      .eq("client_id", id);
-
-    const map: Record<string, boolean> = {};
-    (diagData ?? []).forEach((d: ClientDiagnostico) => { map[d.feature_id] = d.ativo; });
-    setDiagnostico(map);
-  }
-
-  async function logAudit(action: string, entity: string, field?: string, oldValue?: string, newValue?: string) {
+  const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("client_audit").insert({
-      client_id: id,
-      user_id: user.id,
-      action,
-      entity,
-      field: field ?? null,
-      old_value: oldValue ?? null,
-      new_value: newValue ?? null,
-    });
-  }
+    if (!user) { router.push("/login"); return; }
 
-  async function handleToggleFeature(featureId: string, currentValue: boolean) {
-    const newValue = !currentValue;
-    setDiagnostico(prev => ({ ...prev, [featureId]: newValue }));
-
-    await supabase.from("client_diagnostico").upsert({
-      client_id: id,
-      feature_id: featureId,
-      ativo: newValue,
-    }, { onConflict: "client_id,feature_id" });
-
-    const feature = features.find(f => f.id === featureId);
-    await logAudit(
-      newValue ? "ativou funcionalidade" : "desativou funcionalidade",
-      "Diagnóstico",
-      feature?.nome ?? "Funcionalidade",
-      currentValue ? "Ativo" : "Inativo",
-      newValue ? "Ativo" : "Inativo"
-    );
-    await loadAudit();
-  }
-
-  async function handleSavePercepcoes() {
-    setSavingPercepcoes(true);
-    const { data: clientData } = await supabase
-      .from("clients")
-      .select("percepcoes_gerais")
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
       .eq("id", id)
       .single();
-    await supabase.from("clients").update({ percepcoes_gerais: percepcoes }).eq("id", id);
-    await logAudit("editou", "Diagnóstico", "Percepções gerais", clientData?.percepcoes_gerais ?? "(vazio)", percepcoes);
-    await loadAudit();
-    setSavedPercepcoes(percepcoes);
-    setEditingPercepcoes(false);
-    setSavingPercepcoes(false);
-  }
+    setProfile(profile);
+
+    // Buscar email via função segura
+    const { data: emailData } = await supabase
+      .rpc("get_user_email", { user_id_input: id as string });
+    setUserEmail(emailData ?? "");
+
+    const { data: userRoles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", id);
+    const roleList = (userRoles ?? []).map((r: any) => r.role);
+    setRoles(roleList);
+
+    const { data: clients } = await supabase
+      .from("clients")
+      .select("id, marca, bandeira, operacao, plano, cluster, status, last_contact")
+      .eq("csm_id", id)
+      .eq("status", "ativo")
+      .order("marca")
+      .limit(10000);
+    setClients(clients ?? []);
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    const { count } = await supabase
+      .from("client_contacts")
+      .select("id, clients!inner(csm_id)", { count: "exact", head: true })
+      .eq("type", "consultoria_produto")
+      .eq("clients.csm_id", id)
+      .gte("date", startOfMonth.toISOString().split("T")[0]);
+    setContactCount(count ?? 0);
+
+    const followUp = (clients ?? []).filter((c: any) => daysSince(c.last_contact) > 20).length;
+    setFollowUpCount(followUp);
+
+    // Calcular Tentativas de contato sem retorno
+    const { data: allContacts } = await supabase
+      .from("client_contacts")
+      .select("client_id, date, type")
+      .in("client_id", (clients ?? []).map((c: any) => c.id))
+      .order("date", { ascending: false });
+
+    const clientContactsMap: Record<string, any[]> = {};
+    (allContacts ?? []).forEach((c: any) => {
+      if (!clientContactsMap[c.client_id]) clientContactsMap[c.client_id] = [];
+      clientContactsMap[c.client_id].push(c);
+    });
+
+    let semRetorno = 0;
+    (clients ?? []).forEach((client: any) => {
+      const contatos = clientContactsMap[client.id] ?? [];
+      const ultimoEfetivo = contatos.find((c: any) => c.type === "efetivo" || c.type === "consultoria_produto");
+      const tentativasApos = ultimoEfetivo
+        ? contatos.filter((c: any) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
+        : contatos.filter((c: any) => c.type === "tentativa");
+      if (tentativasApos.length >= 3) semRetorno++;
+    });
+    setSemRetornoCount(semRetorno);
+
+    const semRetornoList = (clients ?? []).filter((client: any) => {
+      const contatos = clientContactsMap[client.id] ?? [];
+      const ultimoEfetivo = contatos.find((c: any) => c.type === "efetivo" || c.type === "consultoria_produto");
+      const tentativasApos = ultimoEfetivo
+        ? contatos.filter((c: any) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
+        : contatos.filter((c: any) => c.type === "tentativa");
+      return tentativasApos.length >= 3;
+    });
+    setSemRetornoClients(semRetornoList);
+
+    setLoading(false);
+  }, [id, router]);
 
   useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
-      setCurrentUser(user);
-
-      const { data: client } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (!client) { router.push("/dashboard"); return; }
-      setClient(client);
-      setPercepcoes(client.percepcoes_gerais ?? "");
-      setSavedPercepcoes(client.percepcoes_gerais ?? "");
-      setObservacoes(client.observacoes ?? "");
-      setSavedObservacoes(client.observacoes ?? "");
-
-      if (client.csm_id) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("id", client.csm_id)
-          .single();
-        setCsm(profile);
-      }
-
-      await loadContacts();
-      await loadAudit();
-      await loadDiagnostico();
-      setLoading(false);
-    }
     load();
-  }, [id]);
+  }, [load]);
 
-  async function handleSaveTentativa() {
-    setSavingTentativa(true);
-    await supabase.from("client_contacts").insert({
-      client_id: id,
-      date: tentativaForm.date,
-      type: "tentativa",
-      note: tentativaForm.note || "Tentativa de contato",
-      canal: tentativaForm.canal,
-    });
-    await logAudit("registrou", "Contato", "Tipo", undefined, "Tentativa de contato");
-    await loadContacts();
-    await loadAudit();
-    setTentativaForm({ date: new Date().toISOString().split("T")[0], canal: "whatsapp", note: "" });
-    setShowTentativaModal(false);
-    setSavingTentativa(false);
-  }
-
-  async function handleSaveObservacoes() {
-    setSavingObservacoes(true);
-    const { data: clientData } = await supabase
-      .from("clients")
-      .select("observacoes")
-      .eq("id", id)
-      .single();
-    
-    await supabase.from("clients").update({ observacoes }).eq("id", id);
-    await logAudit("editou", "Observações", "Observações", clientData?.observacoes ?? "(vazio)", observacoes);
-    await loadAudit();
-    setSavedObservacoes(observacoes);
-    setEditingObservacoes(false);
-    setSavingObservacoes(false);
-  }
-
-  async function handleSaveContact() {
-    if (noteIsEmpty(form.note)) return;
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
     setSaving(true);
 
-    if (editingContact) {
-      const fields: { key: keyof Contact; label: string }[] = [
-        { key: "type", label: "Tipo" },
-        { key: "date", label: "Data" },
-        { key: "note", label: "Anotação" },
-        { key: "canal", label: "Canal" },
-      ];
+    await supabase.from("profiles").update({
+      full_name: editForm.full_name,
+      monthly_goal: editForm.hasMeta ? editForm.monthly_goal : null,
+    }).eq("id", id);
 
-      for (const field of fields) {
-        const oldVal = String(editingContact[field.key] ?? "");
-        const newVal = String(form[field.key as keyof typeof form] ?? "");
-        if (oldVal !== newVal) {
-          await logAudit("editou", "Contato", field.label, oldVal, newVal);
-        }
-      }
-
-      await supabase.from("client_contacts").update({
-        type: form.type,
-        date: form.date,
-        note: form.note,
-        canal: form.canal,
-      }).eq("id", editingContact.id);
-    } else {
-      await supabase.from("client_contacts").insert({
-        client_id: id,
-        date: form.date,
-        type: form.type,
-        note: form.note,
-        canal: form.canal,
+    // Atualizar email se mudou
+    if (editForm.email && editForm.email !== userEmail) {
+      await fetch("/api/update-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: id, email: editForm.email }),
       });
-
-      const typeLabels: Record<string, string> = {
-        efetivo: "Contato",
-        tentativa: "Tentativa de contato",
-        consultoria_produto: "Consultoria de Produto",
-      };
-
-      await logAudit("registrou", "Contato", "Tipo", undefined, typeLabels[form.type]);
-
-      const { data: clientData } = await supabase
-        .from("clients")
-        .select("last_contact")
-        .eq("id", id)
-        .single();
-
-      if (!clientData?.last_contact || form.date > clientData.last_contact) {
-        await supabase.from("clients").update({ last_contact: form.date }).eq("id", id);
-      }
+      setUserEmail(editForm.email);
     }
 
-    await loadContacts();
-    await loadAudit();
-    setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" });
-    setEditingContact(null);
-    setShowModal(false);
+    // Atualizar roles
+    await supabase.from("user_roles").delete().eq("user_id", id);
+    if (editForm.role === "csm_admin") {
+      await supabase.from("user_roles").insert([
+        { user_id: id, role: "csm" },
+        { user_id: id, role: "admin" },
+      ]);
+    } else {
+      await supabase.from("user_roles").insert({ user_id: id, role: editForm.role });
+    }
+
     setSaving(false);
+    setShowEdit(false);
+    await load();
   }
 
-  async function handleDelete(contact: Contact) {
-    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
-    await logAudit("excluiu", "Contato", "Data", contact.date, undefined);
-    await supabase.from("client_contacts").delete().eq("id", contact.id);
+  async function handleToggleAtivo(desativar: boolean) {
+    const msg = desativar
+      ? `Desativar ${profile?.full_name}? O acesso será bloqueado e os clientes ficarão sem CSM.`
+      : `Reativar ${profile?.full_name}? O acesso será restaurado mas a carteira estará vazia.`;
+    if (!confirm(msg)) return;
 
-    // Recalcular last_contact com o contato mais recente restante
-    const { data: remaining } = await supabase
-      .from("client_contacts")
-      .select("date")
-      .eq("client_id", id)
-      .order("date", { ascending: false })
-      .limit(1);
+    await supabase.from("profiles").update({ ativo: !desativar }).eq("id", id);
 
-    const newLastContact = remaining && remaining.length > 0 ? remaining[0].date : null;
-    await supabase.from("clients").update({ last_contact: newLastContact }).eq("id", id);
+    if (desativar) {
+      // Remover csm_id dos clientes
+      await supabase.from("clients").update({ csm_id: null }).eq("csm_id", id);
+    }
 
-    await loadContacts();
-    await loadAudit();
+    await load();
   }
 
-  function openEdit(contact: Contact) {
-    setEditingContact(contact);
-    setForm({ type: contact.type, date: contact.date, note: contact.note, canal: contact.canal ?? "whatsapp" });
-    setShowModal(true);
-  }
-
-  const typeLabel: Record<string, string> = {
-    tentativa: "Tentativa de contato",
-    efetivo: "Contato",
-    consultoria_produto: "Consultoria de Produto",
-  };
-
-  const typeColor: Record<string, string> = {
-    tentativa: "bg-red-100 text-red-700",
-    efetivo: "bg-green-100 text-green-700",
-    consultoria_produto: "bg-purple-100 text-purple-700",
-  };
-
-  const canalLabel: Record<string, string> = {
-    whatsapp: "WhatsApp",
-    ligacao: "Ligação",
-    email: "E-mail",
-    meet: "Meet",
-  };
+  const filtered = clients
+    .filter(c => {
+      const matchSearch = c.marca.toLowerCase().includes(search.toLowerCase()) || c.bandeira?.includes(search);
+      const matchOperacao = filterOperacao ? c.operacao === filterOperacao : true;
+      const matchCluster = filterCluster ? c.cluster === filterCluster : true;
+      return matchSearch && matchOperacao && matchCluster;
+    })
+    .sort((a, b) => {
+      if (sortOrder === "recente") return daysSince(a.last_contact) - daysSince(b.last_contact);
+      if (sortOrder === "antigo") return daysSince(b.last_contact) - daysSince(a.last_contact);
+      return 0;
+    });
 
   const clusterLabel: Record<string, string> = {
     high_touch: "High Touch",
@@ -519,11 +198,8 @@ export default function ClientPage() {
     entregas: "bg-orange-100 text-orange-700",
   };
 
-  const planoColor: Record<string, string> = {
-    start: "bg-gray-100 text-gray-600",
-    growth: "bg-blue-100 text-blue-700",
-    master: "bg-purple-100 text-purple-700",
-  };
+  const roleLabel = (r: string) => r === "admin" ? "Admin" : "CSM";
+  const roleColor = (r: string) => r === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700";
 
   if (loading) return (
     <div className="min-h-screen bg-slate-800 flex items-center justify-center">
@@ -531,12 +207,7 @@ export default function ClientPage() {
     </div>
   );
 
-  const visibleFeatures = features.filter(
-    f => !f.operacao || f.operacao === "ambos" || f.operacao === client.operacao
-  );
-  const semCategoria = visibleFeatures.filter(f => !f.categoria);
-  const categorias = [...new Set(visibleFeatures.filter(f => f.categoria).map(f => f.categoria))];
-  const ativas = visibleFeatures.filter(f => diagnostico[f.id]).length;
+  const hasMeta = profile?.monthly_goal != null;
 
   return (
     <div className="min-h-screen bg-slate-800">
@@ -548,451 +219,375 @@ export default function ClientPage() {
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
-        {/* Header do cliente */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-2xl font-semibold text-gray-900">{client.marca}</h2>
-                {client.operacao && (
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${operacaoColor[client.operacao]}`}>
-                    {client.operacao}
-                  </span>
-                )}
-                {client.plano && (
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${planoColor[client.plano] ?? "bg-gray-100 text-gray-600"}`}>
-                    {client.plano.charAt(0).toUpperCase() + client.plano.slice(1)}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-gray-400 mt-1">Bandeira {client.bandeira}</p>
-            </div>
-            <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-              client.status === "ativo" ? "bg-green-100 text-green-700" :
-              client.status === "churned" ? "bg-red-100 text-red-700" :
-              "bg-gray-100 text-gray-600"
-            }`}>
-              {client.status}
-            </span>
-          </div>
-        </div>
-
-        {/* Informações */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
-          <h3 className="font-medium text-gray-900 mb-4">Informações</h3>
-          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">CSM Responsável</dt>
-              <dd className="text-sm font-medium text-gray-900">{csm?.full_name ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Cluster</dt>
-              <dd className="text-sm font-medium text-gray-900">{client.cluster ? clusterLabel[client.cluster] : "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Plano</dt>
-              <dd className="text-sm font-medium text-gray-900">{client.plano ? client.plano.charAt(0).toUpperCase() + client.plano.slice(1) : "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Operação</dt>
-              <dd className="text-sm font-medium text-gray-900">{client.operacao ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Início do contrato</dt>
-              <dd className="text-sm font-medium text-gray-900">
-                {client.data_inicio ? new Date(client.data_inicio).toLocaleDateString("pt-BR") : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Último contato</dt>
-              <dd className="text-sm font-medium text-gray-900">
-                {client.last_contact ? new Date(client.last_contact).toLocaleDateString("pt-BR") : "—"}
-              </dd>
-            </div>
-          </dl>
-        </div>
-
-        {/* Tabs */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="flex border-b border-slate-200/60">
-            <button onClick={() => setActiveTab("contatos")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "contatos" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
-              Registro de Contatos
-            </button>
-            <button onClick={() => setActiveTab("diagnostico")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "diagnostico" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
-              Diagnóstico
-            </button>
-            <button onClick={() => setActiveTab("historico")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "historico" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
-              Histórico de Registros
-            </button>
-          </div>
-
-          <div className="p-6">
-
-            {/* Registro de Contatos */}
-            {activeTab === "contatos" && (
+        {/* Header do usuário */}
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm px-6 py-6">
+          {(() => {
+            const goal = profile?.monthly_goal ?? 0;
+            const pct = goal > 0 ? Math.min(100, Math.round((contactCount / goal) * 100)) : 0;
+            return (
               <>
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm text-gray-500">{contacts.length} registros</p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowTentativaModal(true)}
-                      className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                    >
-                      Registrar tentativa de contato
-                    </button>
-                    <button
-                      onClick={() => { setEditingContact(null); setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" }); setShowModal(true); }}
-                      className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      + Registrar contato
-                    </button>
-                  </div>
-                </div>
-                {contacts.length === 0 ? (
-                  <p className="text-sm text-gray-400">Nenhum contato registrado ainda.</p>
-                ) : (
-                  <ol className="space-y-3">
-                    {contacts.map((c) => (
-                      <li key={c.id} className="rounded-xl border border-slate-200/70 bg-white p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColor[c.type]}`}>
-                              {typeLabel[c.type]}
-                            </span>
-                            {c.canal && (
-                              <span className="text-xs text-gray-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">
-                                {canalLabel[c.canal] ?? c.canal}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="text-xs text-gray-400">{new Date(c.date).toLocaleDateString("pt-BR")}</span>
-                            <button onClick={() => openEdit(c)} className="text-xs text-blue-500 hover:text-blue-700">editar</button>
-                            <button onClick={() => handleDelete(c)} className="text-xs text-red-400 hover:text-red-600">excluir</button>
-                          </div>
-                        </div>
-                        <ContactNote note={c.note} />
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </>
-            )}
-
-            {/* Diagnóstico */}
-            {activeTab === "diagnostico" && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <p className="text-sm text-gray-500">{ativas} de {visibleFeatures.length} funcionalidades ativas</p>
-                  {audit.filter(a => a.entity === "Diagnóstico").length > 0 && (
-                    <p className="text-xs text-gray-400">
-                      Última alteração de diagnóstico em: {new Date(audit.filter(a => a.entity === "Diagnóstico")[0].created_at).toLocaleDateString("pt-BR")}
-                    </p>
-                  )}
-                </div>
-
-                {semCategoria.length > 0 && (
-                  <ul className="space-y-1">
-                    {semCategoria.map(f => (
-                      <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-slate-200/60 last:border-0">
-                        <span className="flex items-center gap-1.5 text-sm text-gray-700">
-                          {f.nome}
-                          {f.link && (
-                            <span className="relative inline-flex">
-                              <button
-                                onClick={() => setOpenInfoId(openInfoId === f.id ? null : f.id)}
-                                className="text-gray-400 hover:text-blue-500 transition-colors"
-                                title="Mais informações"
-                              >
-                                <Info size={14} />
-                              </button>
-                              {openInfoId === f.id && (
-                                <span className="absolute left-0 top-6 z-10 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
-                                  <a
-                                    href={f.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => setOpenInfoId(null)}
-                                    className="text-xs text-blue-600 hover:underline"
-                                  >
-                                    Ver artigo de suporte ↗
-                                  </a>
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </span>
-                        <button
-                          onClick={() => handleToggleFeature(f.id, diagnostico[f.id] ?? false)}
-                          className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${diagnostico[f.id] ? "bg-blue-500" : "bg-gray-200"}`}
-                        >
-                          <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${diagnostico[f.id] ? "translate-x-5" : "translate-x-0"}`} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {categorias.map(cat => (
-                  <div key={cat as string}>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">{cat}</p>
-                    <ul className="space-y-1">
-                      {visibleFeatures.filter(f => f.categoria === cat).map(f => (
-                        <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-slate-200/60 last:border-0">
-                          <span className="flex items-center gap-1.5 text-sm text-gray-700">
-                            {f.nome}
-                            {f.link && (
-                              <span className="relative inline-flex">
-                                <button
-                                  onClick={() => setOpenInfoId(openInfoId === f.id ? null : f.id)}
-                                  className="text-gray-400 hover:text-blue-500 transition-colors"
-                                  title="Mais informações"
-                                >
-                                  <Info size={14} />
-                                </button>
-                                {openInfoId === f.id && (
-                                  <span className="absolute left-0 top-6 z-10 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
-                                    <a
-                                      href={f.link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={() => setOpenInfoId(null)}
-                                      className="text-xs text-blue-600 hover:underline"
-                                    >
-                                      Ver artigo de suporte ↗
-                                    </a>
-                                  </span>
-                                )}
-                              </span>
-                            )}
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-semibold shrink-0">
+                      {profile?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-xl font-semibold text-gray-900">{profile?.full_name}</h2>
+                        {roles.map(r => (
+                          <span key={r} className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(r)}`}>
+                            {roleLabel(r)}
                           </span>
-                          <button
-                            onClick={() => handleToggleFeature(f.id, diagnostico[f.id] ?? false)}
-                            className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${diagnostico[f.id] ? "bg-blue-500" : "bg-gray-200"}`}
-                          >
-                            <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${diagnostico[f.id] ? "translate-x-5" : "translate-x-0"}`} />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                        ))}
+                        {profile?.ativo === false && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">
+                            Inativo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-400 mt-0.5">{clients.length} clientes na carteira</p>
+                    </div>
                   </div>
-                ))}
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Percepções gerais</p>
-                    {!editingPercepcoes ? (
-                      <button
-                        onClick={() => setEditingPercepcoes(true)}
-                        className="text-xs text-blue-500 hover:text-blue-700"
-                      >
-                        {percepcoes ? "Editar" : "Adicionar"}
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => { setEditingPercepcoes(false); setPercepcoes(savedPercepcoes); }}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          onClick={handleSavePercepcoes}
-                          disabled={savingPercepcoes}
-                          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {savingPercepcoes ? "Salvando..." : "Salvar"}
-                        </button>
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      onClick={() => {
+                        setEditForm({
+                          full_name: profile?.full_name ?? "",
+                          email: userEmail,
+                          monthly_goal: profile?.monthly_goal ?? 49,
+                          hasMeta: profile?.monthly_goal != null,
+                          role: roles.includes("admin") && roles.includes("csm") ? "csm_admin" : roles[0] ?? "csm",
+                        });
+                        setShowEdit(true);
+                      }}
+                      className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-slate-100"
+                    >
+                      Editar
+                    </button>
+                    {hasMeta && (
+                      <div className="text-right">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Progresso mensal</p>
+                        <p className="text-3xl font-bold tabular-nums text-gray-900 mt-1">
+                          {contactCount}<span className="text-xl text-gray-300"> / {goal}</span>
+                        </p>
+                        <p className="text-xs text-gray-400">consultorias de produto · {pct}%</p>
                       </div>
                     )}
                   </div>
-                  {editingPercepcoes ? (
-                    <textarea
-                      value={percepcoes}
-                      onChange={(e) => setPercepcoes(e.target.value)}
-                      placeholder="Registre percepções sobre o uso da plataforma, pontos de atenção, oportunidades..."
-                      rows={4}
-                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      autoFocus
+                </div>
+
+                {hasMeta && (
+                  <div className="mt-5 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${pct}%`,
+                        background: "linear-gradient(90deg, #2563eb, #facc15, #ef4444)",
+                      }}
                     />
-                  ) : (
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {percepcoes || <span className="text-gray-400">Nenhuma percepção registrada.</span>}
-                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+
+        {/* Cards indicadores */}
+        <div className="grid grid-cols-2 gap-4">
+          <div
+            onClick={() => setModal({ title: "Oportunidades de follow-up", clients: clients.filter(c => daysSince(c.last_contact) > 20).map(c => ({ ...c, daysSinceContact: daysSince(c.last_contact) })) })}
+            className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-gray-500">Oportunidades de follow-up</p>
+              <span className="text-yellow-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </span>
+            </div>
+            <p className="text-3xl font-semibold text-gray-900">{followUpCount}</p>
+            <p className="text-xs text-gray-400 mt-1">clientes sem contato há mais de 20 dias</p>
+          </div>
+
+          <div
+            onClick={() => setModal({ title: "Tentativas de contato sem retorno", clients: semRetornoClients })}
+            className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-gray-500">Tentativas de contato sem retorno</p>
+              <span className="text-red-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </span>
+            </div>
+            <p className="text-3xl font-semibold text-gray-900">{semRetornoCount}</p>
+            <p className="text-xs text-gray-400 mt-1">clientes com 3+ tentativas de contato sem retorno</p>
+          </div>
+        </div>
+
+        {/* Carteira */}
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200/60">
+            <h3 className="font-medium text-gray-900">Carteira</h3>
+          </div>
+          <div className="px-6 py-3 border-b border-slate-200/60 flex flex-wrap gap-3">
+            <input
+              type="text"
+              placeholder="Buscar por nome ou bandeira..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 min-w-[200px] rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <select value={filterOperacao} onChange={e => setFilterOperacao(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none">
+              <option value="">Todas as operações</option>
+              <option value="corridas">Corridas</option>
+              <option value="entregas">Entregas</option>
+            </select>
+            <select value={filterCluster} onChange={e => setFilterCluster(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none">
+              <option value="">Todos os clusters</option>
+              <option value="high_touch">High Touch</option>
+              <option value="mid_touch">Mid Touch</option>
+              <option value="growth_touch">Growth Touch</option>
+              <option value="no_touch">No Touch</option>
+            </select>
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as any)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none">
+              <option value="">Ordem de contato</option>
+              <option value="recente">Contato mais recente</option>
+              <option value="antigo">Contato mais antigo</option>
+            </select>
+          </div>
+          <div className="px-6 py-2 border-b border-slate-200/60">
+            <span className="text-xs text-gray-400">{filtered.length} clientes</span>
+          </div>
+          {filtered.length === 0 ? (
+            <div className="px-6 py-12 text-center text-gray-400 text-sm">Nenhum cliente encontrado.</div>
+          ) : (
+            <ul className="divide-y divide-slate-200/60">
+              {filtered.map((c) => (
+                <li key={c.id} onClick={() => router.push(`/clients/${c.id}`)} className="px-6 py-4 hover:bg-slate-100 cursor-pointer transition-colors">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-gray-900">{c.marca}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${operacaoColor[c.operacao] ?? "bg-gray-100 text-gray-600"}`}>
+                      {c.operacao}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Bandeira {c.bandeira}
+                    {c.cluster ? ` · ${clusterLabel[c.cluster]}` : ""}
+                    {c.plano ? ` · ${c.plano.charAt(0).toUpperCase() + c.plano.slice(1)}` : ""}
+                    {c.last_contact ? ` · último contato há ${daysSince(c.last_contact)} dias` : " · sem contato registrado"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </main>
+
+      {/* Modal de clientes */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">{modal.title}</h3>
+              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
+            </div>
+
+            {/* Filtros — só para follow-up */}
+            {modal.title === "Oportunidades de follow-up" && (
+              <div className="px-6 py-3 border-b border-slate-200/60 space-y-2">
+                <input
+                  type="text"
+                  placeholder="Buscar por nome ou bandeira..."
+                  value={modalSearch}
+                  onChange={e => setModalSearch(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex gap-2 flex-wrap">
+                  <select value={modalOrder} onChange={e => setModalOrder(e.target.value as "asc" | "desc")} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs bg-white focus:outline-none">
+                    <option value="desc">Mais antigos primeiro</option>
+                    <option value="asc">Mais recentes primeiro</option>
+                  </select>
+                  <select value={modalFilterType} onChange={e => setModalFilterType(e.target.value as any)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs bg-white focus:outline-none">
+                    <option value="mais">Mais de X dias</option>
+                    <option value="menos">Menos de X dias</option>
+                    <option value="entre">Entre X e Y dias</option>
+                  </select>
+                  <input type="number" placeholder="X dias" value={modalFilterDays} onChange={e => setModalFilterDays(e.target.value)} className="w-20 rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none" />
+                  {modalFilterType === "entre" && (
+                    <input type="number" placeholder="Y dias" value={modalFilterDays2} onChange={e => setModalFilterDays2(e.target.value)} className="w-20 rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none" />
                   )}
                 </div>
               </div>
             )}
 
-            {/* Histórico de Registros */}
-            {activeTab === "historico" && (
-              <>
-                {audit.length === 0 ? (
-                  <p className="text-sm text-gray-400">Nenhuma alteração registrada ainda.</p>
-                ) : (
-                  <>
-                    <ul className="space-y-3">
-                      {audit.slice(0, auditLimit).map((log) => (
-                        <li key={log.id} className="rounded-xl border border-slate-200/70 bg-white p-4 text-sm">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-gray-800">
-                              {(log.profiles as any)?.full_name} {log.action}
-                              {log.field ? ` — ${log.field}` : ""}
-                            </span>
-                            <span className="text-xs text-gray-400 shrink-0 ml-2">
-                              {new Date(log.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })} às {new Date(log.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-                            </span>
-                          </div>
-                          {(log.old_value || log.new_value) && (
-                            <div className="flex items-center gap-2 text-xs mt-1">
-                              {log.old_value && <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded line-through">{log.old_value}</span>}
-                              {log.old_value && log.new_value && <span className="text-gray-400">→</span>}
-                              {log.new_value && <span className="bg-green-50 text-green-600 px-2 py-0.5 rounded">{log.new_value}</span>}
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                    {audit.length > auditLimit && (
-                      <button
-                        onClick={() => setAuditLimit(prev => prev + 10)}
-                        className="mt-4 w-full text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg py-2 hover:bg-slate-100 transition-colors"
-                      >
-                        Ver mais ({audit.length - auditLimit} restantes)
-                      </button>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-          </div>
-        </div>
-
-        {/* Observações */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-gray-900">Observações</h3>
-            {!editingObservacoes ? (
-              <button
-                onClick={() => setEditingObservacoes(true)}
-                className="text-xs text-blue-500 hover:text-blue-700"
-              >
-                {observacoes ? "Editar" : "Adicionar"}
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { setEditingObservacoes(false); setObservacoes(savedObservacoes); }}
-                  className="text-xs text-gray-500 hover:text-gray-700"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSaveObservacoes}
-                  disabled={savingObservacoes}
-                  className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {savingObservacoes ? "Salvando..." : "Salvar"}
-                </button>
+            {/* Busca simples para tentativas */}
+            {modal.title === "Tentativas de contato sem retorno" && (
+              <div className="px-6 py-3 border-b border-slate-200/60">
+                <input
+                  type="text"
+                  placeholder="Buscar por nome ou bandeira..."
+                  value={modalSearch}
+                  onChange={e => setModalSearch(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             )}
-          </div>
-          {editingObservacoes ? (
-            <textarea
-              value={observacoes}
-              onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Adicione observações sobre este cliente..."
-              className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              rows={4}
-              autoFocus
-            />
-          ) : (
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">
-              {observacoes || <span className="text-gray-400">Nenhuma observação registrada.</span>}
-            </p>
-          )}
-        </div>
 
-      </main>
+            <div className="px-6 py-2 border-b border-slate-200/60">
+              <span className="text-xs text-gray-400">
+                {(() => {
+                  let list = modal.clients;
+                  if (modalSearch) list = list.filter((c: any) => c.marca.toLowerCase().includes(modalSearch.toLowerCase()) || c.bandeira?.includes(modalSearch));
+                  if (modal.title === "Oportunidades de follow-up" && modalFilterDays) {
+                    const d1 = parseInt(modalFilterDays);
+                    const d2 = parseInt(modalFilterDays2);
+                    if (!isNaN(d1)) {
+                      list = list.filter((c: any) => {
+                        const days = daysSince(c.last_contact);
+                        if (modalFilterType === "mais") return days > d1;
+                        if (modalFilterType === "menos") return days < d1;
+                        if (modalFilterType === "entre" && !isNaN(d2)) return days >= d1 && days <= d2;
+                        return true;
+                      });
+                    }
+                  }
+                  return `${list.length} clientes`;
+                })()}
+              </span>
+            </div>
 
-      {/* Modal tentativa de contato */}
-      {showTentativaModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">Registrar tentativa de contato</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Canal</label>
-                <select value={tentativaForm.canal} onChange={(e) => setTentativaForm({ ...tentativaForm, canal: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="ligacao">Ligação</option>
-                  <option value="email">E-mail</option>
-                  <option value="meet">Meet</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Data</label>
-                <input type="date" value={tentativaForm.date} onChange={(e) => setTentativaForm({ ...tentativaForm, date: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Observação (opcional)</label>
-                <textarea value={tentativaForm.note} onChange={(e) => setTentativaForm({ ...tentativaForm, note: e.target.value })} placeholder="Ex: Não atendeu, deixei recado..." rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setShowTentativaModal(false)} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-              <button onClick={handleSaveTentativa} disabled={savingTentativa} className="flex-1 rounded-lg bg-gray-800 text-white px-4 py-2 text-sm font-medium hover:bg-gray-900 disabled:opacity-50">
-                {savingTentativa ? "Salvando..." : "Registrar tentativa de contato"}
-              </button>
-            </div>
+            <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
+              {(() => {
+                let list = [...modal.clients];
+                if (modalSearch) list = list.filter((c: any) => c.marca.toLowerCase().includes(modalSearch.toLowerCase()) || c.bandeira?.includes(modalSearch));
+                if (modal.title === "Oportunidades de follow-up") {
+                  const d1 = parseInt(modalFilterDays);
+                  const d2 = parseInt(modalFilterDays2);
+                  if (!isNaN(d1)) {
+                    list = list.filter((c: any) => {
+                      const days = daysSince(c.last_contact);
+                      if (modalFilterType === "mais") return days > d1;
+                      if (modalFilterType === "menos") return days < d1;
+                      if (modalFilterType === "entre" && !isNaN(d2)) return days >= d1 && days <= d2;
+                      return true;
+                    });
+                  }
+                  list.sort((a: any, b: any) => modalOrder === "desc"
+                    ? daysSince(b.last_contact) - daysSince(a.last_contact)
+                    : daysSince(a.last_contact) - daysSince(b.last_contact)
+                  );
+                }
+                if (list.length === 0) return [<li key="empty" className="px-6 py-8 text-center text-sm text-gray-400">Nenhum cliente encontrado.</li>];
+                return list.map((c: any) => (
+                  <li key={c.id} onClick={() => { setModal(null); router.push(`/clients/${c.id}`); }} className="px-6 py-4 hover:bg-slate-100 cursor-pointer transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">{c.marca}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Bandeira {c.bandeira} · {c.last_contact ? `último contato há ${daysSince(c.last_contact)} dias` : "sem contato registrado"}
+                        </p>
+                      </div>
+                      <span className="text-xs text-gray-400">→</span>
+                    </div>
+                  </li>
+                ));
+              })()}
+            </ul>
           </div>
         </div>
       )}
 
-      {/* Modal registrar/editar contato */}
-      {showModal && (
+      {/* Modal editar usuário */}
+      {showEdit && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">{editingContact ? "Editar contato" : "Registrar contato"}</h3>
-            <div className="space-y-4">
+            <h3 className="font-semibold text-gray-900 mb-4">Editar usuário</h3>
+            <form onSubmit={handleSaveEdit} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="efetivo">Contato</option>
-                  <option value="consultoria_produto">Consultoria de Produto</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Canal</label>
-                <select value={form.canal} onChange={(e) => setForm({ ...form, canal: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="ligacao">Ligação</option>
-                  <option value="email">E-mail</option>
-                  <option value="meet">Meet</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Data</label>
-                <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Anotação</label>
-                <RichTextEditor
-                  initialValue={editingContact ? editingContact.note : ""}
-                  onChange={(html) => setForm(prev => ({ ...prev, note: html }))}
-                  placeholder="O que foi discutido?"
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nome completo</label>
+                <input
+                  type="text"
+                  value={editForm.full_name}
+                  onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
+                  required
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => { setShowModal(false); setEditingContact(null); }} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-              <button onClick={handleSaveContact} disabled={saving || noteIsEmpty(form.note)} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-                {saving ? "Salvando..." : editingContact ? "Salvar alterações" : "Salvar"}
-              </button>
-            </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">E-mail</label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                  required
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Perfil</label>
+                <select
+                  value={editForm.role}
+                  onChange={e => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="csm">CSM</option>
+                  <option value="admin">Admin</option>
+                  <option value="csm_admin">CSM + Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-600 mb-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.hasMeta}
+                    onChange={e => setEditForm({ ...editForm, hasMeta: e.target.checked })}
+                    className="rounded"
+                  />
+                  Possui meta mensal de contatos
+                </label>
+                {editForm.hasMeta && (
+                  <input
+                    type="number"
+                    value={editForm.monthly_goal}
+                    onChange={e => setEditForm({ ...editForm, monthly_goal: parseInt(e.target.value) })}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowEdit(false)} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+                <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+
+              {/* Botão desativar/reativar */}
+              <div className="pt-2 border-t border-gray-100">
+                {profile?.ativo !== false ? (
+                  <button
+                    type="button"
+                    onClick={() => { setShowEdit(false); handleToggleAtivo(true); }}
+                    className="w-full rounded-lg border border-red-200 text-red-500 px-4 py-2 text-sm hover:bg-red-50 transition-colors"
+                  >
+                    Desativar usuário
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { setShowEdit(false); handleToggleAtivo(false); }}
+                    className="w-full rounded-lg border border-green-200 text-green-600 px-4 py-2 text-sm hover:bg-green-50 transition-colors"
+                  >
+                    Reativar usuário
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       )}
