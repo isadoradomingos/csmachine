@@ -160,14 +160,14 @@ export default function AdminPage() {
   const roleColor = (role: string) => role === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700";
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400 text-sm">Carregando...</p>
+    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+      <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-800">
+      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
@@ -197,27 +197,27 @@ export default function AdminPage() {
 
         {/* Cards gerais */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 mb-8">
-          <div onClick={() => setActiveModal("csms")} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
+          <div onClick={() => setActiveModal("csms")} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
             <p className="text-xs text-gray-400 mb-2">CSMs ativos</p>
             <p className="text-3xl font-semibold text-gray-900">{stats.csmCount}</p>
           </div>
-          <div onClick={() => { setClientSearch(""); setActiveModal("clientes"); }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
+          <div onClick={() => { setClientSearch(""); setActiveModal("clientes"); }} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
             <p className="text-xs text-gray-400 mb-2">Clientes na carteira</p>
             <p className="text-3xl font-semibold text-gray-900">{stats.totalClients}</p>
           </div>
-          <div onClick={() => { setContatoFilterCSM(""); setActiveModal("contatos"); }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
+          <div onClick={() => { setContatoFilterCSM(""); setActiveModal("contatos"); }} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
             <p className="text-xs text-gray-400 mb-2">Consultorias de Produto no mês</p>
             <p className="text-3xl font-semibold text-gray-900">{stats.totalContacts}</p>
           </div>
-          <div onClick={() => setActiveModal("meta")} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
+          <div onClick={() => setActiveModal("meta")} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
             <p className="text-xs text-gray-400 mb-2">Meta coletiva</p>
             <p className="text-3xl font-semibold text-gray-900">{stats.metaPercent}%</p>
           </div>
         </div>
 
         {/* Lista de usuários */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
             <h3 className="font-medium text-gray-900">Usuários</h3>
             <button
               onClick={() => { setShowInvite(true); setInviteStatus("idle"); }}
@@ -226,12 +226,12 @@ export default function AdminPage() {
               + Adicionar usuário
             </button>
           </div>
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-slate-200/60">
             {users.map((u) => (
               <li
                 key={u.id}
                 onClick={() => router.push(`/admin/usuario/${u.id}`)}
-                className={`px-6 py-4 flex items-center justify-between cursor-pointer transition-colors ${u.ativo === false ? "bg-gray-50 opacity-60" : "hover:bg-gray-50"}`}
+                className={`px-6 py-4 flex items-center justify-between cursor-pointer transition-colors ${u.ativo === false ? "bg-slate-100 opacity-60" : "hover:bg-slate-100"}`}
               >
                 <div className="flex items-center gap-3">
                   <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${u.ativo === false ? "bg-gray-200 text-gray-500" : "bg-blue-100 text-blue-700"}`}>
@@ -264,13 +264,13 @@ export default function AdminPage() {
       {activeModal === "csms" && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setActiveModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">CSMs ativos</h3>
               <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
             </div>
-            <ul className="divide-y divide-gray-100 overflow-y-auto flex-1">
+            <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
               {users.filter(u => u.roles.includes("csm")).map(u => (
-                <li key={u.id} onClick={() => { setActiveModal(null); router.push(`/admin/usuario/${u.id}`); }} className="px-6 py-4 flex items-center gap-3 hover:bg-gray-50 cursor-pointer transition-colors">
+                <li key={u.id} onClick={() => { setActiveModal(null); router.push(`/admin/usuario/${u.id}`); }} className="px-6 py-4 flex items-center gap-3 hover:bg-slate-100 cursor-pointer transition-colors">
                   <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-semibold shrink-0">
                     {u.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
                   </div>
@@ -286,11 +286,11 @@ export default function AdminPage() {
       {activeModal === "clientes" && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setActiveModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Clientes na carteira</h3>
               <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
             </div>
-            <div className="px-6 py-3 border-b border-gray-100">
+            <div className="px-6 py-3 border-b border-slate-200/60">
               <input
                 type="text"
                 placeholder="Buscar por nome ou bandeira..."
@@ -299,16 +299,16 @@ export default function AdminPage() {
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <div className="px-6 py-2 border-b border-gray-100">
+            <div className="px-6 py-2 border-b border-slate-200/60">
               <span className="text-xs text-gray-400">
                 {allClients.filter(c => c.marca.toLowerCase().includes(clientSearch.toLowerCase()) || c.bandeira?.includes(clientSearch)).length} clientes
               </span>
             </div>
-            <ul className="divide-y divide-gray-100 overflow-y-auto flex-1">
+            <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
               {allClients
                 .filter(c => c.marca.toLowerCase().includes(clientSearch.toLowerCase()) || c.bandeira?.includes(clientSearch))
                 .map(c => (
-                  <li key={c.id} onClick={() => { setActiveModal(null); router.push(`/clients/${c.id}`); }} className="px-6 py-3 hover:bg-gray-50 cursor-pointer transition-colors">
+                  <li key={c.id} onClick={() => { setActiveModal(null); router.push(`/clients/${c.id}`); }} className="px-6 py-3 hover:bg-slate-100 cursor-pointer transition-colors">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-gray-900 text-sm">{c.marca}</p>
@@ -327,11 +327,11 @@ export default function AdminPage() {
       {activeModal === "contatos" && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setActiveModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Consultorias de Produto no mês</h3>
               <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
             </div>
-            <div className="px-6 py-3 border-b border-gray-100">
+            <div className="px-6 py-3 border-b border-slate-200/60">
               <select
                 value={contatoFilterCSM}
                 onChange={e => setContatoFilterCSM(e.target.value)}
@@ -343,19 +343,19 @@ export default function AdminPage() {
                 ))}
               </select>
             </div>
-            <div className="px-6 py-2 border-b border-gray-100">
+            <div className="px-6 py-2 border-b border-slate-200/60">
               <span className="text-xs text-gray-400">
                 {contatosList.filter((c: any) => !contatoFilterCSM || c.clients?.csm_id === contatoFilterCSM).length} consultorias de produto realizadas
               </span>
             </div>
-            <ul className="divide-y divide-gray-100 overflow-y-auto flex-1">
+            <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
               {contatosList
                 .filter((c: any) => !contatoFilterCSM || c.clients?.csm_id === contatoFilterCSM)
                 .map((c: any) => {
                   const client = allClients.find(cl => cl.id === c.client_id);
                   const csm = users.find(u => u.id === c.clients?.csm_id);
                   return (
-                    <li key={c.id} onClick={() => { setActiveModal(null); router.push(`/clients/${c.client_id}`); }} className="px-6 py-3 hover:bg-gray-50 cursor-pointer transition-colors">
+                    <li key={c.id} onClick={() => { setActiveModal(null); router.push(`/clients/${c.client_id}`); }} className="px-6 py-3 hover:bg-slate-100 cursor-pointer transition-colors">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium text-gray-900 text-sm">{client?.marca ?? "—"}</p>
@@ -377,11 +377,11 @@ export default function AdminPage() {
       {activeModal === "meta" && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setActiveModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">Meta coletiva</h3>
               <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
             </div>
-            <ul className="divide-y divide-gray-100 overflow-y-auto flex-1">
+            <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
               {users.filter(u => u.roles.includes("csm") && u.monthly_goal).map(u => {
                 const contacts = contatosCSMMap[u.id] ?? 0;
                 const goal = u.monthly_goal ?? 49;

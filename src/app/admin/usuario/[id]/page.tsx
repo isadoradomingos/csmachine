@@ -202,16 +202,16 @@ export default function AdminUsuarioPage() {
   const roleColor = (r: string) => r === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700";
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400 text-sm">Carregando...</p>
+    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+      <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
 
   const hasMeta = profile?.monthly_goal != null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-800">
+      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
@@ -222,7 +222,7 @@ export default function AdminUsuarioPage() {
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
         {/* Header do usuário */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-5">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm px-6 py-5">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
               <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-semibold shrink-0">
@@ -256,7 +256,7 @@ export default function AdminUsuarioPage() {
                 });
                 setShowEdit(true);
               }}
-              className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50"
+              className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-slate-100"
             >
               Editar
             </button>
@@ -286,7 +286,7 @@ export default function AdminUsuarioPage() {
         <div className="grid grid-cols-2 gap-4">
           <div
             onClick={() => setModal({ title: "Oportunidades de follow-up", clients: clients.filter(c => daysSince(c.last_contact) > 20).map(c => ({ ...c, daysSinceContact: daysSince(c.last_contact) })) })}
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
+            className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
           >
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm text-gray-500">Oportunidades de follow-up</p>
@@ -302,7 +302,7 @@ export default function AdminUsuarioPage() {
 
           <div
             onClick={() => setModal({ title: "Tentativas de contato sem retorno", clients: semRetornoClients })}
-            className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
+            className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow"
           >
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm text-gray-500">Tentativas de contato sem retorno</p>
@@ -318,11 +318,11 @@ export default function AdminUsuarioPage() {
         </div>
 
         {/* Carteira */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200/60">
             <h3 className="font-medium text-gray-900">Carteira</h3>
           </div>
-          <div className="px-6 py-3 border-b border-gray-100 flex flex-wrap gap-3">
+          <div className="px-6 py-3 border-b border-slate-200/60 flex flex-wrap gap-3">
             <input
               type="text"
               placeholder="Buscar por nome ou bandeira..."
@@ -348,15 +348,15 @@ export default function AdminUsuarioPage() {
               <option value="antigo">Contato mais antigo</option>
             </select>
           </div>
-          <div className="px-6 py-2 border-b border-gray-100">
+          <div className="px-6 py-2 border-b border-slate-200/60">
             <span className="text-xs text-gray-400">{filtered.length} clientes</span>
           </div>
           {filtered.length === 0 ? (
             <div className="px-6 py-12 text-center text-gray-400 text-sm">Nenhum cliente encontrado.</div>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-slate-200/60">
               {filtered.map((c) => (
-                <li key={c.id} onClick={() => router.push(`/clients/${c.id}`)} className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors">
+                <li key={c.id} onClick={() => router.push(`/clients/${c.id}`)} className="px-6 py-4 hover:bg-slate-100 cursor-pointer transition-colors">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-gray-900">{c.marca}</p>
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${operacaoColor[c.operacao] ?? "bg-gray-100 text-gray-600"}`}>
@@ -380,14 +380,14 @@ export default function AdminUsuarioPage() {
       {modal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900">{modal.title}</h3>
               <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
             </div>
 
             {/* Filtros — só para follow-up */}
             {modal.title === "Oportunidades de follow-up" && (
-              <div className="px-6 py-3 border-b border-gray-100 space-y-2">
+              <div className="px-6 py-3 border-b border-slate-200/60 space-y-2">
                 <input
                   type="text"
                   placeholder="Buscar por nome ou bandeira..."
@@ -415,7 +415,7 @@ export default function AdminUsuarioPage() {
 
             {/* Busca simples para tentativas */}
             {modal.title === "Tentativas de contato sem retorno" && (
-              <div className="px-6 py-3 border-b border-gray-100">
+              <div className="px-6 py-3 border-b border-slate-200/60">
                 <input
                   type="text"
                   placeholder="Buscar por nome ou bandeira..."
@@ -426,7 +426,7 @@ export default function AdminUsuarioPage() {
               </div>
             )}
 
-            <div className="px-6 py-2 border-b border-gray-100">
+            <div className="px-6 py-2 border-b border-slate-200/60">
               <span className="text-xs text-gray-400">
                 {(() => {
                   let list = modal.clients;
@@ -449,7 +449,7 @@ export default function AdminUsuarioPage() {
               </span>
             </div>
 
-            <ul className="divide-y divide-gray-100 overflow-y-auto flex-1">
+            <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
               {(() => {
                 let list = [...modal.clients];
                 if (modalSearch) list = list.filter((c: any) => c.marca.toLowerCase().includes(modalSearch.toLowerCase()) || c.bandeira?.includes(modalSearch));
@@ -472,7 +472,7 @@ export default function AdminUsuarioPage() {
                 }
                 if (list.length === 0) return [<li key="empty" className="px-6 py-8 text-center text-sm text-gray-400">Nenhum cliente encontrado.</li>];
                 return list.map((c: any) => (
-                  <li key={c.id} onClick={() => { setModal(null); router.push(`/clients/${c.id}`); }} className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors">
+                  <li key={c.id} onClick={() => { setModal(null); router.push(`/clients/${c.id}`); }} className="px-6 py-4 hover:bg-slate-100 cursor-pointer transition-colors">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-gray-900 text-sm">{c.marca}</p>

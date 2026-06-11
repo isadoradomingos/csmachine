@@ -526,8 +526,8 @@ export default function ClientPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400 text-sm">Carregando...</p>
+    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+      <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
 
@@ -539,8 +539,8 @@ export default function ClientPage() {
   const ativas = visibleFeatures.filter(f => diagnostico[f.id]).length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-800">
+      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
@@ -551,7 +551,7 @@ export default function ClientPage() {
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
 
         {/* Header do cliente */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-3 flex-wrap">
@@ -580,7 +580,7 @@ export default function ClientPage() {
         </div>
 
         {/* Informações */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <h3 className="font-medium text-gray-900 mb-4">Informações</h3>
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <div>
@@ -615,8 +615,8 @@ export default function ClientPage() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="flex border-b border-gray-100">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="flex border-b border-slate-200/60">
             <button onClick={() => setActiveTab("contatos")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "contatos" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
               Registro de Contatos
             </button>
@@ -638,7 +638,7 @@ export default function ClientPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setShowTentativaModal(true)}
-                      className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
                     >
                       Registrar tentativa de contato
                     </button>
@@ -655,7 +655,7 @@ export default function ClientPage() {
                 ) : (
                   <ol className="space-y-3">
                     {contacts.map((c) => (
-                      <li key={c.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <li key={c.id} className="rounded-xl border border-slate-200/70 bg-white p-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColor[c.type]}`}>
@@ -696,7 +696,7 @@ export default function ClientPage() {
                 {semCategoria.length > 0 && (
                   <ul className="space-y-1">
                     {semCategoria.map(f => (
-                      <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
+                      <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-slate-200/60 last:border-0">
                         <span className="flex items-center gap-1.5 text-sm text-gray-700">
                           {f.nome}
                           {f.link && (
@@ -740,7 +740,7 @@ export default function ClientPage() {
                     <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">{cat}</p>
                     <ul className="space-y-1">
                       {visibleFeatures.filter(f => f.categoria === cat).map(f => (
-                        <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
+                        <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-slate-200/60 last:border-0">
                           <span className="flex items-center gap-1.5 text-sm text-gray-700">
                             {f.nome}
                             {f.link && (
@@ -835,7 +835,7 @@ export default function ClientPage() {
                   <>
                     <ul className="space-y-3">
                       {audit.slice(0, auditLimit).map((log) => (
-                        <li key={log.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm">
+                        <li key={log.id} className="rounded-xl border border-slate-200/70 bg-white p-4 text-sm">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-gray-800">
                               {(log.profiles as any)?.full_name} {log.action}
@@ -858,7 +858,7 @@ export default function ClientPage() {
                     {audit.length > auditLimit && (
                       <button
                         onClick={() => setAuditLimit(prev => prev + 10)}
-                        className="mt-4 w-full text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg py-2 hover:bg-gray-50 transition-colors"
+                        className="mt-4 w-full text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg py-2 hover:bg-slate-100 transition-colors"
                       >
                         Ver mais ({audit.length - auditLimit} restantes)
                       </button>
@@ -872,7 +872,7 @@ export default function ClientPage() {
         </div>
 
         {/* Observações */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium text-gray-900">Observações</h3>
             {!editingObservacoes ? (

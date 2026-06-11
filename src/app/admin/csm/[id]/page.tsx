@@ -76,14 +76,14 @@ export default function AdminCsmPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400 text-sm">Carregando...</p>
+    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+      <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-800">
+      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
@@ -94,7 +94,7 @@ export default function AdminCsmPage() {
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
         {/* Header do CSM */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
               <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-semibold">
@@ -149,12 +149,12 @@ export default function AdminCsmPage() {
         </div>
 
         {/* Lista de clientes */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
             <h3 className="font-medium text-gray-900">Carteira</h3>
             <span className="text-xs text-gray-400">{filtered.length} clientes</span>
           </div>
-          <div className="px-6 py-3 border-b border-gray-100">
+          <div className="px-6 py-3 border-b border-slate-200/60">
             <input
               type="text"
               placeholder="Buscar por nome ou bandeira..."
@@ -166,12 +166,12 @@ export default function AdminCsmPage() {
           {filtered.length === 0 ? (
             <div className="px-6 py-12 text-center text-gray-400 text-sm">Nenhum cliente encontrado.</div>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-slate-200/60">
               {filtered.map((c) => (
                 <li
                   key={c.id}
                   onClick={() => router.push(`/clients/${c.id}`)}
-                  className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                  className="px-6 py-4 hover:bg-slate-100 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div>

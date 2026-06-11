@@ -118,14 +118,14 @@ export default function UsuariosPage() {
   const roleColor = (role: string) => role === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700";
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400 text-sm">Carregando...</p>
+    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+      <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-800">
+      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
@@ -148,11 +148,11 @@ export default function UsuariosPage() {
         </div>
 
         {/* Lista de usuários */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200/60">
             <h3 className="font-medium text-gray-900">{users.length} usuários cadastrados</h3>
           </div>
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-slate-200/60">
             {users.map(user => (
               <li key={user.id} className="px-6 py-4 flex items-center justify-between gap-4">
                 <div>

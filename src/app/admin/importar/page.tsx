@@ -122,8 +122,8 @@ export default function ImportarPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-800">
+      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
@@ -149,15 +149,15 @@ export default function ImportarPage() {
           <a href="/modelo_importacao.csv" download className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">↓ Baixar modelo</a>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <h3 className="font-medium text-gray-900 mb-4">Selecionar arquivo CSV</h3>
           <input type="file" accept=".csv" onChange={handleFile} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
           <p className="text-xs text-gray-400 mt-2">Colunas: bandeira*, marca*, operacao*, csm*, cluster, plano</p>
         </div>
 
         {rows.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
               <h3 className="font-medium text-gray-900">{rows.length} linhas encontradas</h3>
               {!done && (
                 <button onClick={handleImport} disabled={importing} className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
@@ -166,14 +166,14 @@ export default function ImportarPage() {
               )}
             </div>
             {done && (
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex gap-6 text-sm flex-wrap">
+              <div className="px-6 py-4 bg-slate-100/70 border-b border-slate-200/70 flex gap-6 text-sm flex-wrap">
                 <span className="text-green-700">✓ {summary.atualizados} atualizados</span>
                 <span className="text-blue-700">+ {summary.adicionados} adicionados</span>
                 <span className="text-yellow-700">⚠ {summary.ignorados} ignorados</span>
                 {summary.erros > 0 && <span className="text-red-700">✗ {summary.erros} erros</span>}
               </div>
             )}
-            <ul className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+            <ul className="divide-y divide-slate-200/60 max-h-96 overflow-y-auto">
               {rows.map((r, i) => (
                 <li key={i} className="px-6 py-3 flex items-center justify-between text-sm">
                   <div>
