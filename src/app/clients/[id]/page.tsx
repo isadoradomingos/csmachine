@@ -38,10 +38,138 @@ type AuditLog = {
   profiles: { full_name: string };
 };
 
+function escapeHtml(text: string) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function isHtmlNote(note: string) {
+  return /<[a-z][\s\S]*>/i.test(note);
+}
+
+function noteIsEmpty(html: string) {
+  return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").trim() === "";
+}
+
+function sanitizeNote(html: string): string {
+  if (typeof window === "undefined") return "";
+  const allowed = new Set(["B", "STRONG", "U", "I", "EM", "UL", "OL", "LI", "BR", "P", "DIV", "SPAN"]);
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const clean = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return escapeHtml(node.textContent ?? "");
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const el = node as Element;
+    const children = Array.from(el.childNodes).map(clean).join("");
+    if (!allowed.has(el.tagName)) return children;
+    const tag = el.tagName.toLowerCase();
+    if (tag === "br") return "<br>";
+    return `<${tag}>${children}</${tag}>`;
+  };
+  return Array.from(doc.body.childNodes).map(clean).join("");
+}
+
+function RichTextEditor({ initialValue, onChange, placeholder }: { initialValue: string; onChange: (html: string) => void; placeholder?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.innerHTML = isHtmlNote(initialValue)
+        ? sanitizeNote(initialValue)
+        : escapeHtml(initialValue).replace(/\n/g, "<br>");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function emit() {
+    if (ref.current) onChange(ref.current.innerHTML);
+  }
+
+  function exec(command: string) {
+    ref.current?.focus();
+    document.execCommand(command);
+    emit();
+  }
+
+  function closestLi(node: Node | null): HTMLElement | null {
+    let cur: Node | null = node;
+    while (cur && cur !== ref.current) {
+      if (cur.nodeType === Node.ELEMENT_NODE && (cur as Element).tagName === "LI") return cur as HTMLElement;
+      cur = cur.parentNode;
+    }
+    return null;
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const li = closestLi(sel.anchorNode);
+
+    // Tab dentro de um tópico → subtópico | Shift+Tab → volta um nível
+    if (e.key === "Tab") {
+      if (li) {
+        e.preventDefault();
+        document.execCommand(e.shiftKey ? "outdent" : "indent");
+        emit();
+      }
+      return;
+    }
+
+    // Backspace em tópico vazio → remove a bolinha e vira linha normal
+    if (e.key === "Backspace") {
+      if (li && sel.isCollapsed && (li.textContent ?? "").trim() === "") {
+        e.preventDefault();
+        document.execCommand("outdent");
+        emit();
+      }
+      return;
+    }
+
+    // "-" + espaço no início da linha → vira tópico automaticamente
+    if (e.key === " " && !li && sel.isCollapsed) {
+      const node = sel.anchorNode;
+      if (
+        node &&
+        node.nodeType === Node.TEXT_NODE &&
+        sel.anchorOffset === 1 &&
+        (node.textContent ?? "").startsWith("-") &&
+        !node.previousSibling
+      ) {
+        e.preventDefault();
+        const range = document.createRange();
+        range.setStart(node, 0);
+        range.setEnd(node, 1);
+        range.deleteContents();
+        document.execCommand("insertUnorderedList");
+        emit();
+      }
+    }
+  }
+
+  const btn = "px-2.5 py-1 text-xs rounded border border-gray-200 bg-white text-gray-600 hover:bg-gray-100 transition-colors";
+
+  return (
+    <div>
+      <div className="flex gap-1.5 mb-1.5">
+        <button type="button" onMouseDown={(e) => { e.preventDefault(); exec("bold"); }} className={`${btn} font-bold`} title="Negrito (Ctrl+B)">B</button>
+        <button type="button" onMouseDown={(e) => { e.preventDefault(); exec("italic"); }} className={`${btn} italic`} title="Itálico (Ctrl+I)">I</button>
+        <button type="button" onMouseDown={(e) => { e.preventDefault(); exec("underline"); }} className={`${btn} underline`} title="Sublinhado (Ctrl+U)">U</button>
+        <span className="text-[11px] text-gray-400 self-center ml-1">dica: &quot;-&quot; + espaço cria tópicos</span>
+      </div>
+      <div
+        ref={ref}
+        contentEditable
+        onInput={emit}
+        onKeyDown={handleKeyDown}
+        data-placeholder={placeholder}
+        className="w-full min-h-24 max-h-60 overflow-y-auto rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_ul]:list-[circle] [&_ol]:list-decimal [&_ol]:pl-5 empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 empty:before:pointer-events-none"
+      />
+    </div>
+  );
+}
+
 function ContactNote({ note }: { note: string }) {
   const [expanded, setExpanded] = useState(false);
   const [clamped, setClamped] = useState(false);
-  const ref = useRef<HTMLParagraphElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -50,12 +178,20 @@ function ContactNote({ note }: { note: string }) {
 
   return (
     <div className="mt-2">
-      <p
-        ref={ref}
-        className={`text-sm text-gray-700 whitespace-pre-wrap ${expanded ? "" : "line-clamp-5"}`}
-      >
-        {note}
-      </p>
+      {isHtmlNote(note) ? (
+        <div
+          ref={ref}
+          dangerouslySetInnerHTML={{ __html: sanitizeNote(note) }}
+          className={`text-sm text-gray-700 [&_ul]:list-disc [&_ul]:pl-5 [&_ul_ul]:list-[circle] [&_ol]:list-decimal [&_ol]:pl-5 ${expanded ? "" : "line-clamp-5"}`}
+        />
+      ) : (
+        <div
+          ref={ref}
+          className={`text-sm text-gray-700 whitespace-pre-wrap ${expanded ? "" : "line-clamp-5"}`}
+        >
+          {note}
+        </div>
+      )}
       {(clamped || expanded) && (
         <button
           onClick={() => setExpanded(!expanded)}
@@ -265,7 +401,7 @@ export default function ClientPage() {
   }
 
   async function handleSaveContact() {
-    if (!form.note.trim()) return;
+    if (noteIsEmpty(form.note)) return;
     setSaving(true);
 
     if (editingContact) {
@@ -844,12 +980,16 @@ export default function ClientPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Anotação</label>
-                <textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="O que foi discutido?" rows={4} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                <RichTextEditor
+                  initialValue={editingContact ? editingContact.note : ""}
+                  onChange={(html) => setForm(prev => ({ ...prev, note: html }))}
+                  placeholder="O que foi discutido?"
+                />
               </div>
             </div>
             <div className="flex gap-3 mt-6">
               <button onClick={() => { setShowModal(false); setEditingContact(null); }} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
-              <button onClick={handleSaveContact} disabled={saving || !form.note.trim()} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              <button onClick={handleSaveContact} disabled={saving || noteIsEmpty(form.note)} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
                 {saving ? "Salvando..." : editingContact ? "Salvar alterações" : "Salvar"}
               </button>
             </div>
