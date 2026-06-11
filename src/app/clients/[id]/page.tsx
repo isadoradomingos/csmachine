@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
+import { Info } from "lucide-react";
 
 type Contact = {
   id: string;
@@ -17,6 +18,8 @@ type Feature = {
   nome: string;
   categoria: string | null;
   ordem: number;
+  operacao: string | null;
+  link: string | null;
 };
 
 type ClientDiagnostico = {
@@ -57,6 +60,7 @@ export default function ClientPage() {
   const [saving, setSaving] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [activeTab, setActiveTab] = useState<"contatos" | "diagnostico" | "historico">("contatos");
+  const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const [auditLimit, setAuditLimit] = useState(10);
   const [form, setForm] = useState({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" });
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -361,9 +365,12 @@ export default function ClientPage() {
     </div>
   );
 
-  const semCategoria = features.filter(f => !f.categoria);
-  const categorias = [...new Set(features.filter(f => f.categoria).map(f => f.categoria))];
-  const ativas = features.filter(f => diagnostico[f.id]).length;
+  const visibleFeatures = features.filter(
+    f => !f.operacao || f.operacao === "ambos" || f.operacao === client.operacao
+  );
+  const semCategoria = visibleFeatures.filter(f => !f.categoria);
+  const categorias = [...new Set(visibleFeatures.filter(f => f.categoria).map(f => f.categoria))];
+  const ativas = visibleFeatures.filter(f => diagnostico[f.id]).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -512,7 +519,7 @@ export default function ClientPage() {
             {activeTab === "diagnostico" && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <p className="text-sm text-gray-500">{ativas} de {features.length} funcionalidades ativas</p>
+                  <p className="text-sm text-gray-500">{ativas} de {visibleFeatures.length} funcionalidades ativas</p>
                   {audit.filter(a => a.entity === "Diagnóstico").length > 0 && (
                     <p className="text-xs text-gray-400">
                       Última alteração de diagnóstico em: {new Date(audit.filter(a => a.entity === "Diagnóstico")[0].created_at).toLocaleDateString("pt-BR")}
@@ -524,7 +531,33 @@ export default function ClientPage() {
                   <ul className="space-y-1">
                     {semCategoria.map(f => (
                       <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
-                        <span className="text-sm text-gray-700">{f.nome}</span>
+                        <span className="flex items-center gap-1.5 text-sm text-gray-700">
+                          {f.nome}
+                          {f.link && (
+                            <span className="relative inline-flex">
+                              <button
+                                onClick={() => setOpenInfoId(openInfoId === f.id ? null : f.id)}
+                                className="text-gray-400 hover:text-blue-500 transition-colors"
+                                title="Mais informações"
+                              >
+                                <Info size={14} />
+                              </button>
+                              {openInfoId === f.id && (
+                                <span className="absolute left-0 top-6 z-10 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
+                                  <a
+                                    href={f.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={() => setOpenInfoId(null)}
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    Ver artigo de suporte ↗
+                                  </a>
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </span>
                         <button
                           onClick={() => handleToggleFeature(f.id, diagnostico[f.id] ?? false)}
                           className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${diagnostico[f.id] ? "bg-blue-500" : "bg-gray-200"}`}
@@ -540,9 +573,35 @@ export default function ClientPage() {
                   <div key={cat as string}>
                     <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">{cat}</p>
                     <ul className="space-y-1">
-                      {features.filter(f => f.categoria === cat).map(f => (
+                      {visibleFeatures.filter(f => f.categoria === cat).map(f => (
                         <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
-                          <span className="text-sm text-gray-700">{f.nome}</span>
+                          <span className="flex items-center gap-1.5 text-sm text-gray-700">
+                            {f.nome}
+                            {f.link && (
+                              <span className="relative inline-flex">
+                                <button
+                                  onClick={() => setOpenInfoId(openInfoId === f.id ? null : f.id)}
+                                  className="text-gray-400 hover:text-blue-500 transition-colors"
+                                  title="Mais informações"
+                                >
+                                  <Info size={14} />
+                                </button>
+                                {openInfoId === f.id && (
+                                  <span className="absolute left-0 top-6 z-10 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
+                                    <a
+                                      href={f.link}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => setOpenInfoId(null)}
+                                      className="text-xs text-blue-600 hover:underline"
+                                    >
+                                      Ver artigo de suporte ↗
+                                    </a>
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </span>
                           <button
                             onClick={() => handleToggleFeature(f.id, diagnostico[f.id] ?? false)}
                             className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${diagnostico[f.id] ? "bg-blue-500" : "bg-gray-200"}`}
