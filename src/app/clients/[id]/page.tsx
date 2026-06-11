@@ -693,6 +693,50 @@ export default function ClientPage() {
                   )}
                 </div>
 
+                <div className="rounded-xl border border-slate-200/70 bg-white p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Percepções gerais</p>
+                    {!editingPercepcoes ? (
+                      <button
+                        onClick={() => setEditingPercepcoes(true)}
+                        className="text-xs text-blue-500 hover:text-blue-700"
+                      >
+                        {percepcoes ? "Editar" : "Adicionar"}
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => { setEditingPercepcoes(false); setPercepcoes(savedPercepcoes); }}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={handleSavePercepcoes}
+                          disabled={savingPercepcoes}
+                          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {savingPercepcoes ? "Salvando..." : "Salvar"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {editingPercepcoes ? (
+                    <textarea
+                      value={percepcoes}
+                      onChange={(e) => setPercepcoes(e.target.value)}
+                      placeholder="Registre percepções sobre o uso da plataforma, pontos de atenção, oportunidades..."
+                      rows={4}
+                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                      autoFocus
+                    />
+                  ) : (
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      {percepcoes || <span className="text-gray-400">Nenhuma percepção registrada.</span>}
+                    </p>
+                  )}
+                </div>
+
                 {semCategoria.length > 0 && (
                   <ul className="space-y-1">
                     {semCategoria.map(f => (
@@ -779,50 +823,6 @@ export default function ClientPage() {
                     </ul>
                   </div>
                 ))}
-
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Percepções gerais</p>
-                    {!editingPercepcoes ? (
-                      <button
-                        onClick={() => setEditingPercepcoes(true)}
-                        className="text-xs text-blue-500 hover:text-blue-700"
-                      >
-                        {percepcoes ? "Editar" : "Adicionar"}
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => { setEditingPercepcoes(false); setPercepcoes(savedPercepcoes); }}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          onClick={handleSavePercepcoes}
-                          disabled={savingPercepcoes}
-                          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {savingPercepcoes ? "Salvando..." : "Salvar"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  {editingPercepcoes ? (
-                    <textarea
-                      value={percepcoes}
-                      onChange={(e) => setPercepcoes(e.target.value)}
-                      placeholder="Registre percepções sobre o uso da plataforma, pontos de atenção, oportunidades..."
-                      rows={4}
-                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      autoFocus
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {percepcoes || <span className="text-gray-400">Nenhuma percepção registrada.</span>}
-                    </p>
-                  )}
-                </div>
               </div>
             )}
 
