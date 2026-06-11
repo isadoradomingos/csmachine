@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter, useParams } from "next/navigation";
 import { Info } from "lucide-react";
@@ -37,6 +37,36 @@ type AuditLog = {
   created_at: string;
   profiles: { full_name: string };
 };
+
+function ContactNote({ note }: { note: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  const ref = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el) setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [note]);
+
+  return (
+    <div className="mt-2">
+      <p
+        ref={ref}
+        className={`text-sm text-gray-700 whitespace-pre-wrap ${expanded ? "" : "line-clamp-5"}`}
+      >
+        {note}
+      </p>
+      {(clamped || expanded) && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-blue-500 hover:text-blue-700 mt-1 font-medium"
+        >
+          {expanded ? "ver menos" : "ver mais"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function ClientPage() {
   const router = useRouter();
@@ -507,7 +537,7 @@ export default function ClientPage() {
                             <button onClick={() => handleDelete(c)} className="text-xs text-red-400 hover:text-red-600">excluir</button>
                           </div>
                         </div>
-                        <p className="text-sm text-gray-700 mt-2">{c.note}</p>
+                        <ContactNote note={c.note} />
                       </li>
                     ))}
                   </ol>
