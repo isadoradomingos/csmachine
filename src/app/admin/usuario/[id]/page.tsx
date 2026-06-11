@@ -222,64 +222,76 @@ export default function AdminUsuarioPage() {
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
         {/* Header do usuário */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm px-6 py-5">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-semibold shrink-0">
-                {profile?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl font-semibold text-gray-900">{profile?.full_name}</h2>
-                  {roles.map(r => (
-                    <span key={r} className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(r)}`}>
-                      {roleLabel(r)}
-                    </span>
-                  ))}
-                  {profile?.ativo === false && (
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">
-                      Inativo
-                    </span>
-                  )}
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm px-6 py-6">
+          {(() => {
+            const goal = profile?.monthly_goal ?? 0;
+            const pct = goal > 0 ? Math.min(100, Math.round((contactCount / goal) * 100)) : 0;
+            return (
+              <>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-semibold shrink-0">
+                      {profile?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-xl font-semibold text-gray-900">{profile?.full_name}</h2>
+                        {roles.map(r => (
+                          <span key={r} className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(r)}`}>
+                            {roleLabel(r)}
+                          </span>
+                        ))}
+                        {profile?.ativo === false && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">
+                            Inativo
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-400 mt-0.5">{clients.length} clientes na carteira</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      onClick={() => {
+                        setEditForm({
+                          full_name: profile?.full_name ?? "",
+                          email: userEmail,
+                          monthly_goal: profile?.monthly_goal ?? 49,
+                          hasMeta: profile?.monthly_goal != null,
+                          role: roles.includes("admin") && roles.includes("csm") ? "csm_admin" : roles[0] ?? "csm",
+                        });
+                        setShowEdit(true);
+                      }}
+                      className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-slate-100"
+                    >
+                      Editar
+                    </button>
+                    {hasMeta && (
+                      <div className="text-right">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Progresso mensal</p>
+                        <p className="text-3xl font-bold tabular-nums text-gray-900 mt-1">
+                          {contactCount}<span className="text-xl text-gray-300"> / {goal}</span>
+                        </p>
+                        <p className="text-xs text-gray-400">consultorias de produto · {pct}%</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm text-gray-400 mt-0.5">{clients.length} clientes na carteira</p>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                setEditForm({
-                  full_name: profile?.full_name ?? "",
-                  email: userEmail,
-                  monthly_goal: profile?.monthly_goal ?? 49,
-                  hasMeta: profile?.monthly_goal != null,
-                  role: roles.includes("admin") && roles.includes("csm") ? "csm_admin" : roles[0] ?? "csm",
-                });
-                setShowEdit(true);
-              }}
-              className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-slate-100"
-            >
-              Editar
-            </button>
-          </div>
 
-          {/* Barra de progresso — só se tiver meta */}
-          {hasMeta && (
-            <div className="mt-5">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Progresso mensal</p>
-                <p className="text-sm font-semibold text-gray-900">{contactCount} / {profile?.monthly_goal} <span className="text-xs font-medium text-gray-900">consultorias de produto</span></p>
-              </div>
-              <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-2 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, Math.round((contactCount / (profile?.monthly_goal ?? 1)) * 100))}%`,
-                    background: "linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)",
-                  }}
-                />
-              </div>
-            </div>
-          )}
+                {hasMeta && (
+                  <div className="mt-5 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${pct}%`,
+                        background: "linear-gradient(90deg, #2563eb, #facc15, #ef4444)",
+                      }}
+                    />
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/* Cards indicadores */}
