@@ -222,8 +222,9 @@ export default function DashboardPage() {
       <main className="max-w-5xl mx-auto px-6 py-8">
         {/* Painel de progresso */}
         {(() => {
-          const goal = profile?.monthly_goal ?? 49;
-          const pct = goal > 0 ? Math.min(100, Math.round((contactCount / goal) * 100)) : 0;
+          const goal = profile?.monthly_goal ?? 0;
+          const temMeta = goal > 0;
+          const pct = temMeta ? Math.min(100, Math.round((contactCount / goal) * 100)) : 0;
           return (
             <section className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm px-6 py-6 mb-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -238,20 +239,24 @@ export default function DashboardPage() {
                     title="Ver com quem você fez consultoria este mês"
                     className="text-3xl font-bold tabular-nums text-gray-900 mt-1 hover:text-blue-600 transition-colors cursor-pointer"
                   >
-                    {contactCount}<span className="text-xl text-gray-300"> / {goal}</span>
+                    {contactCount}{temMeta && <span className="text-xl text-gray-300"> / {goal}</span>}
                   </button>
-                  <p className="text-xs text-gray-400">consultorias de produto · {pct}%</p>
+                  <p className="text-xs text-gray-400">consultorias de produto{temMeta ? ` · ${pct}%` : ""}</p>
                 </div>
               </div>
-              <div className="mt-5 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-2 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${pct}%`,
-                    background: "linear-gradient(90deg, #2563eb, #facc15, #ef4444)",
-                  }}
-                />
-              </div>
+              {temMeta ? (
+                <div className="mt-5 w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-2 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${pct}%`,
+                      background: "linear-gradient(90deg, #2563eb, #facc15, #ef4444)",
+                    }}
+                  />
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-gray-400">Nenhuma meta mensal definida.</p>
+              )}
             </section>
           );
         })()}

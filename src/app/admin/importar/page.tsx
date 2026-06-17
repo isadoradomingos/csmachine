@@ -53,6 +53,7 @@ export default function ImportarPage() {
   const [inativadosCount, setInativadosCount] = useState(0);
   const [buscaPrevia, setBuscaPrevia] = useState("");
   const [buscaAusentes, setBuscaAusentes] = useState("");
+  const [erroArquivo, setErroArquivo] = useState("");
 
   function diasSince(date: string | null): number {
     if (!date) return 9999;
@@ -65,12 +66,38 @@ export default function ImportarPage() {
     file.text().then(text => {
       const lines = text.trim().split("\n");
       const headers = lines[0].split(",").map((h: string) => h.trim().toLowerCase());
+
+      // Valida o cabeçalho: a planilha de carteira precisa ter as colunas obrigatórias.
+      // Isso evita subir o arquivo errado (ex: um export do Pipefy) nesta tela.
+      const faltando = REQUIRED_FIELDS.filter(c => !headers.includes(c));
+      if (faltando.length > 0) {
+        setRows([]);
+        setAnalisado(false);
+        setConcluido(false);
+        setAusentes([]);
+        setErroArquivo(
+          `Este arquivo não parece ser uma planilha de carteira. Faltam as colunas: ${faltando.join(", ")}. ` +
+          `O cabeçalho deve conter: ${REQUIRED_FIELDS.join(", ")} (e opcionalmente cluster, plano).`
+        );
+        setFileKey(k => k + 1);
+        return;
+      }
+
+      setErroArquivo("");
       const parsed: ImportRow[] = lines.slice(1).map((line: string) => {
         const values = line.split(",").map((v: string) => v.trim());
         const obj: Record<string, string> = {};
         headers.forEach((h: string, i: number) => { obj[h] = values[i] ?? ""; });
         return obj as unknown as ImportRow;
       }).filter((r: ImportRow) => r.bandeira);
+
+      if (parsed.length === 0) {
+        setRows([]);
+        setErroArquivo("O arquivo foi lido, mas nenhuma linha válida foi encontrada (verifique se há dados além do cabeçalho).");
+        setFileKey(k => k + 1);
+        return;
+      }
+
       setRows(parsed);
       setAnalisado(false);
       setConcluido(false);
@@ -229,6 +256,7 @@ export default function ImportarPage() {
     setConcluido(false);
     setAusentes([]);
     setSelecionados(new Set());
+    setErroArquivo("");
     setFileKey(k => k + 1);
   }
 
@@ -298,6 +326,11 @@ export default function ImportarPage() {
           <h3 className="font-medium text-gray-900 mb-4">Selecionar arquivo CSV</h3>
           <input key={fileKey} type="file" accept=".csv" onChange={handleFile} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
           <p className="text-xs text-gray-400 mt-2">Colunas: bandeira*, marca*, operacao*, csm*, cluster, plano</p>
+          {erroArquivo && (
+            <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+              ⚠️ {erroArquivo}
+            </div>
+          )}
           {rows.length > 0 && !analisado && !concluido && (
             <div className="mt-4 flex items-center gap-2">
               <button onClick={handleAnalisar} disabled={analisando} className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
