@@ -51,6 +51,8 @@ export default function ImportarPage() {
   const [totalAtivos, setTotalAtivos] = useState(0);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [inativadosCount, setInativadosCount] = useState(0);
+  const [buscaPrevia, setBuscaPrevia] = useState("");
+  const [buscaAusentes, setBuscaAusentes] = useState("");
 
   function diasSince(date: string | null): number {
     if (!date) return 9999;
@@ -206,8 +208,20 @@ export default function ImportarPage() {
       return next;
     });
   }
-  function marcarTodos() { setSelecionados(new Set(ausentes.map(c => c.id))); }
-  function desmarcarTodos() { setSelecionados(new Set()); }
+  function marcarTodos() {
+    setSelecionados(prev => {
+      const next = new Set(prev);
+      ausentesFiltrados.forEach(c => next.add(c.id));
+      return next;
+    });
+  }
+  function desmarcarTodos() {
+    setSelecionados(prev => {
+      const next = new Set(prev);
+      ausentesFiltrados.forEach(c => next.delete(c.id));
+      return next;
+    });
+  }
 
   function cancelar() {
     setRows([]);
@@ -244,6 +258,17 @@ export default function ImportarPage() {
 
   const pctAusentes = totalAtivos > 0 ? Math.round((ausentes.length / totalAtivos) * 100) : 0;
   const muitos = pctAusentes >= 10;
+
+  const rowsFiltradas = rows.filter(r => {
+    if (!buscaPrevia.trim()) return true;
+    const q = buscaPrevia.toLowerCase();
+    return (r.marca ?? "").toLowerCase().includes(q) || (r.bandeira ?? "").includes(buscaPrevia.trim());
+  });
+  const ausentesFiltrados = ausentes.filter(c => {
+    if (!buscaAusentes.trim()) return true;
+    const q = buscaAusentes.toLowerCase();
+    return c.marca.toLowerCase().includes(q) || (c.bandeira ?? "").includes(buscaAusentes.trim());
+  });
 
   return (
     <div className="min-h-screen bg-slate-800">
@@ -295,8 +320,11 @@ export default function ImportarPage() {
                   <span className="text-yellow-700">⚠ {previa.ignorar} a ignorar</span>
                 </div>
               </div>
+              <div className="px-6 py-3 border-b border-slate-200/60">
+                <input type="text" placeholder="Buscar por marca ou bandeira..." value={buscaPrevia} onChange={e => setBuscaPrevia(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
               <ul className="divide-y divide-slate-200/60 max-h-72 overflow-y-auto">
-                {rows.map((r, i) => (
+                {rowsFiltradas.map((r, i) => (
                   <li key={i} className="px-6 py-3 flex items-center justify-between text-sm">
                     <div>
                       <span className="font-medium text-gray-900">Bandeira {r.bandeira}</span>
@@ -329,12 +357,17 @@ export default function ImportarPage() {
               {ausentes.length > 0 && (
                 <>
                   <div className="px-6 py-3 border-b border-slate-200/60 flex items-center gap-4 text-xs">
-                    <button onClick={marcarTodos} className="text-blue-600 hover:text-blue-800 font-medium">Marcar todos</button>
-                    <button onClick={desmarcarTodos} className="text-gray-500 hover:text-gray-700 font-medium">Desmarcar todos</button>
+                    <button onClick={marcarTodos} className="text-blue-600 hover:text-blue-800 font-medium">Marcar {buscaAusentes ? "filtrados" : "todos"}</button>
+                    <button onClick={desmarcarTodos} className="text-gray-500 hover:text-gray-700 font-medium">Desmarcar {buscaAusentes ? "filtrados" : "todos"}</button>
                     <span className="text-gray-400 ml-auto">{selecionados.size} selecionado(s)</span>
                   </div>
+                  <div className="px-6 py-3 border-b border-slate-200/60">
+                    <input type="text" placeholder="Buscar por marca ou bandeira..." value={buscaAusentes} onChange={e => setBuscaAusentes(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
                   <ul className="divide-y divide-slate-200/60 max-h-72 overflow-y-auto">
-                    {ausentes.map((c) => (
+                    {ausentesFiltrados.length === 0 ? (
+                      <li className="px-6 py-6 text-center text-sm text-gray-400">Nenhum cliente encontrado para &quot;{buscaAusentes}&quot;.</li>
+                    ) : ausentesFiltrados.map((c) => (
                       <li key={c.id} className="px-6 py-3 flex items-center gap-3 text-sm">
                         <input type="checkbox" checked={selecionados.has(c.id)} onChange={() => toggleSel(c.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0" />
                         <div className="min-w-0 flex-1">
