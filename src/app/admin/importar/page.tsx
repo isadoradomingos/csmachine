@@ -122,35 +122,39 @@ export default function ImportarPage() {
 
     // Em vez de inativar automaticamente: monta a lista de ausentes para confirmação.
     // Busca em lotes (a API do Supabase limita ~1000 linhas por requisição).
-    type AtivoRow = { id: string; marca: string; bandeira: string | null; last_contact: string | null; profiles: { full_name: string } | { full_name: string }[] | null };
+    // Sem join — o nome do CSM é resolvido depois, à parte, para não arriscar
+    // que um relacionamento mal configurado faça a query inteira falhar.
+    type AtivoRow = { id: string; marca: string; bandeira: string | null; last_contact: string | null; csm_id: string | null };
     const ativos: AtivoRow[] = [];
     const lote = 1000;
     for (let offset = 0; ; offset += lote) {
-      const { data: pagina } = await supabase
+      const { data: pagina, error } = await supabase
         .from("clients")
-        .select("id, marca, bandeira, last_contact, csm_id, profiles:csm_id(full_name)")
+        .select("id, marca, bandeira, last_contact, csm_id")
         .eq("status", "ativo")
         .order("id")
         .range(offset, offset + lote - 1);
+      if (error) { console.error("Erro ao buscar ativos:", error); break; }
       if (!pagina || pagina.length === 0) break;
       ativos.push(...(pagina as AtivoRow[]));
       if (pagina.length < lote) break;
     }
 
+    // Mapa de id -> nome do CSM (usa os profiles já carregados, completa se faltar)
+    const nomePorId: Record<string, string> = {};
+    profiles.forEach(p => { nomePorId[p.id] = p.full_name; });
+
     const setBandeiras = new Set(bandeirasNaPlanilha.map(b => b.trim()));
     const lista: AusenteCliente[] = ativos
       .filter((c) => !c.bandeira || !setBandeiras.has(c.bandeira.trim()))
-      .map((c) => {
-        const prof = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
-        return {
-          id: c.id,
-          marca: c.marca,
-          bandeira: c.bandeira,
-          csm_nome: prof?.full_name ?? "—",
-          last_contact: c.last_contact,
-          diasSemContato: diasSince(c.last_contact),
-        };
-      })
+      .map((c) => ({
+        id: c.id,
+        marca: c.marca,
+        bandeira: c.bandeira,
+        csm_nome: (c.csm_id && nomePorId[c.csm_id]) ? nomePorId[c.csm_id] : "—",
+        last_contact: c.last_contact,
+        diasSemContato: diasSince(c.last_contact),
+      }))
       .sort((a, b) => b.diasSemContato - a.diasSemContato);
 
     setTotalAtivos(ativos.length);
@@ -350,7 +354,7 @@ export default function ImportarPage() {
 
         {done && !inativacaoFeita && ausentes.length === 0 && (
           <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-sm text-green-800">
-            ✓ Importação concluída. Nenhum cliente foi inativado.
+            ✓ Importação concluída. {totalAtivos === 0 ? "Nenhum cliente ativo foi encontrado na base para revisar." : "Todos os clientes ativos estão na planilha — nenhum a inativar."}
           </div>
         )}
       </main>
