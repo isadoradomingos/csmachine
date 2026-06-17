@@ -395,7 +395,7 @@ export default function AdminPage() {
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div
                         className="h-1.5 rounded-full transition-all"
-                        style={{ width: `${percent}%`, background: "linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899)" }}
+                        style={{ width: `${percent}%`, background: "linear-gradient(90deg, #2563eb, #facc15, #ef4444)" }}
                       />
                     </div>
                   </li>
