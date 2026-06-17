@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 const OPERACOES = ["corridas", "entregas"];
 const CLUSTERS = ["high_touch", "mid_touch", "growth_touch", "no_touch"];
@@ -20,12 +21,34 @@ type ImportRow = {
   message?: string;
 };
 
+type AusenteCliente = {
+  id: string;
+  marca: string;
+  bandeira: string | null;
+  csm_nome: string;
+  last_contact: string | null;
+  diasSemContato: number;
+};
+
 export default function ImportarPage() {
   const router = useRouter();
   const [rows, setRows] = useState<ImportRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
-  const [profiles, setProfiles] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<{ id: string; full_name: string }[]>([]);
+
+  // Etapa de inativação
+  const [ausentes, setAusentes] = useState<AusenteCliente[]>([]);
+  const [totalAtivos, setTotalAtivos] = useState(0);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [inativando, setInativando] = useState(false);
+  const [inativacaoFeita, setInativacaoFeita] = useState(false);
+  const [inativadosCount, setInativadosCount] = useState(0);
+
+  function diasSince(date: string | null): number {
+    if (!date) return 9999;
+    return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -37,12 +60,14 @@ export default function ImportarPage() {
     const headers = lines[0].split(",").map((h: string) => h.trim().toLowerCase());
     const parsed: ImportRow[] = lines.slice(1).map((line: string) => {
       const values = line.split(",").map((v: string) => v.trim());
-      const obj: any = {};
+      const obj: Record<string, string> = {};
       headers.forEach((h: string, i: number) => { obj[h] = values[i] ?? ""; });
-      return { ...obj, status: "pendente" };
-    }).filter((r: any) => r.bandeira);
+      return { ...(obj as unknown as ImportRow), status: "pendente" as const };
+    }).filter((r: ImportRow) => r.bandeira);
     setRows(parsed);
     setDone(false);
+    setAusentes([]);
+    setInativacaoFeita(false);
   }
 
   async function handleImport() {
@@ -58,11 +83,11 @@ export default function ImportarPage() {
           .eq("bandeira", row.bandeira)
           .maybeSingle();
 
-        const profile = profiles.find((p: any) => p.full_name.toLowerCase() === (row.csm ?? "").toLowerCase());
+        const profile = profiles.find((p) => p.full_name.toLowerCase() === (row.csm ?? "").toLowerCase());
 
         if (existing) {
           bandeirasNaPlanilha.push(row.bandeira);
-          const updateObj: any = { status: "ativo" };
+          const updateObj: Record<string, string> = { status: "ativo" };
           if (row.marca) updateObj.marca = row.marca;
           if (row.operacao && OPERACOES.includes(row.operacao)) updateObj.operacao = row.operacao;
           if (row.cluster && CLUSTERS.includes(row.cluster)) updateObj.cluster = row.cluster;
@@ -77,10 +102,10 @@ export default function ImportarPage() {
             continue;
           }
           bandeirasNaPlanilha.push(row.bandeira);
-          const newClient: any = {
-            marca: row.marca,
+          const newClient: Record<string, string> = {
+            marca: row.marca ?? "",
             bandeira: row.bandeira,
-            operacao: row.operacao,
+            operacao: row.operacao ?? "",
             csm_id: profile.id,
             status: "ativo",
           };
@@ -94,16 +119,60 @@ export default function ImportarPage() {
       }
     }
 
-    if (bandeirasNaPlanilha.length > 0) {
-      await supabase
-        .from("clients")
-        .update({ status: "inativo" })
-        .not("bandeira", "in", `(${bandeirasNaPlanilha.map((b: string) => `'${b}'`).join(",")})`);
-    }
+    // Em vez de inativar automaticamente: monta a lista de ausentes para confirmação
+    const { data: ativos } = await supabase
+      .from("clients")
+      .select("id, marca, bandeira, last_contact, csm_id, profiles:csm_id(full_name)")
+      .eq("status", "ativo")
+      .limit(10000);
 
+    const setBandeiras = new Set(bandeirasNaPlanilha.map(b => b.trim()));
+    const lista: AusenteCliente[] = (ativos ?? [])
+      .filter((c: { bandeira: string | null }) => !c.bandeira || !setBandeiras.has(c.bandeira.trim()))
+      .map((c: { id: string; marca: string; bandeira: string | null; last_contact: string | null; profiles: { full_name: string } | { full_name: string }[] | null }) => {
+        const prof = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
+        return {
+          id: c.id,
+          marca: c.marca,
+          bandeira: c.bandeira,
+          csm_nome: prof?.full_name ?? "—",
+          last_contact: c.last_contact,
+          diasSemContato: diasSince(c.last_contact),
+        };
+      })
+      .sort((a, b) => b.diasSemContato - a.diasSemContato);
+
+    setTotalAtivos((ativos ?? []).length);
+    setAusentes(lista);
+    setSelecionados(new Set(lista.map(c => c.id))); // todos marcados por padrão
     setRows(updated);
     setImporting(false);
     setDone(true);
+  }
+
+  function toggleSel(id: string) {
+    setSelecionados(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function marcarTodos() { setSelecionados(new Set(ausentes.map(c => c.id))); }
+  function desmarcarTodos() { setSelecionados(new Set()); }
+
+  async function handleInativar() {
+    if (selecionados.size === 0) return;
+    setInativando(true);
+    const ids = [...selecionados];
+    // inativa em lotes para não estourar a query
+    for (let i = 0; i < ids.length; i += 100) {
+      const lote = ids.slice(i, i + 100);
+      await supabase.from("clients").update({ status: "inativo" }).in("id", lote);
+    }
+    setInativadosCount(ids.length);
+    setInativando(false);
+    setInativacaoFeita(true);
+    setAusentes([]);
   }
 
   const statusColor: Record<string, string> = {
@@ -121,11 +190,14 @@ export default function ImportarPage() {
     erros: rows.filter(r => r.status === "erro").length,
   };
 
+  const pctAusentes = totalAtivos > 0 ? Math.round((ausentes.length / totalAtivos) * 100) : 0;
+  const muitos = pctAusentes >= 10;
+
   return (
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
+          <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
@@ -133,12 +205,8 @@ export default function ImportarPage() {
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Administração</p>
-          <h2 className="text-2xl font-semibold text-white mt-1">Importar planilha</h2>
-          <p className="text-gray-500 text-sm mt-1">A planilha representa a carteira atual. Clientes ausentes serão marcados como inativos.</p>
-        </div>
-
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-          ⚠️ <strong>Atenção:</strong> ao confirmar, todos os clientes fora da planilha serão marcados como <strong>inativos</strong>.
+          <h2 className="text-2xl font-semibold text-white mt-1">Importar carteira</h2>
+          <p className="text-gray-400 text-sm mt-1">Adiciona e atualiza clientes. Clientes ausentes da planilha podem ser inativados na etapa de revisão — nada é inativado automaticamente.</p>
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center justify-between">
@@ -188,6 +256,76 @@ export default function ImportarPage() {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Etapa de revisão de inativação */}
+        {done && !inativacaoFeita && ausentes.length > 0 && (
+          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200/60">
+              <h3 className="font-medium text-gray-900">Clientes ativos fora da planilha</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {ausentes.length} {ausentes.length === 1 ? "cliente ativo não apareceu" : "clientes ativos não apareceram"} na planilha. Marque quais deseja inativar — nenhum será inativado sem sua confirmação.
+              </p>
+            </div>
+
+            {muitos && (
+              <div className="px-6 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
+                ⚠️ <strong>Atenção:</strong> isso representa {pctAusentes}% da carteira ativa ({ausentes.length} de {totalAtivos}). Confirme se a planilha está completa antes de inativar.
+              </div>
+            )}
+
+            <div className="px-6 py-3 border-b border-slate-200/60 flex items-center gap-4 text-xs">
+              <button onClick={marcarTodos} className="text-blue-600 hover:text-blue-800 font-medium">Marcar todos</button>
+              <button onClick={desmarcarTodos} className="text-gray-500 hover:text-gray-700 font-medium">Desmarcar todos</button>
+              <span className="text-gray-400 ml-auto">{selecionados.size} selecionado(s)</span>
+            </div>
+
+            <ul className="divide-y divide-slate-200/60 max-h-96 overflow-y-auto">
+              {ausentes.map((c) => (
+                <li key={c.id} className="px-6 py-3 flex items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selecionados.has(c.id)}
+                    onChange={() => toggleSel(c.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium text-gray-900">{c.marca}</span>
+                    <span className="text-gray-400 ml-2">Bandeira {c.bandeira ?? "—"}</span>
+                    <span className="text-gray-400 ml-2">· {c.csm_nome}</span>
+                  </div>
+                  <span className={`text-xs shrink-0 ${c.diasSemContato > 60 ? "text-amber-600" : "text-gray-400"}`}>
+                    {c.last_contact ? `há ${c.diasSemContato} dias` : "sem contato"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="px-6 py-4 border-t border-slate-200/60 flex items-center justify-end gap-3">
+              <button onClick={() => setAusentes([])} className="text-xs text-gray-500 hover:text-gray-700 px-4 py-2">
+                Pular (não inativar ninguém)
+              </button>
+              <button
+                onClick={handleInativar}
+                disabled={inativando || selecionados.size === 0}
+                className="text-xs bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {inativando ? "Inativando..." : `Inativar ${selecionados.size} selecionado(s)`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {inativacaoFeita && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-sm text-green-800">
+            ✓ {inativadosCount} cliente(s) inativado(s) com sucesso.
+          </div>
+        )}
+
+        {done && !inativacaoFeita && ausentes.length === 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-sm text-green-800">
+            ✓ Importação concluída. Nenhum cliente foi inativado.
           </div>
         )}
       </main>
