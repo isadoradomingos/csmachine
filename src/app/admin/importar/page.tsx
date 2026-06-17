@@ -36,6 +36,7 @@ export default function ImportarPage() {
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState(false);
   const [profiles, setProfiles] = useState<{ id: string; full_name: string }[]>([]);
+  const [fileKey, setFileKey] = useState(0);
 
   // Etapa de inativação
   const [ausentes, setAusentes] = useState<AusenteCliente[]>([]);
@@ -119,17 +120,27 @@ export default function ImportarPage() {
       }
     }
 
-    // Em vez de inativar automaticamente: monta a lista de ausentes para confirmação
-    const { data: ativos } = await supabase
-      .from("clients")
-      .select("id, marca, bandeira, last_contact, csm_id, profiles:csm_id(full_name)")
-      .eq("status", "ativo")
-      .limit(10000);
+    // Em vez de inativar automaticamente: monta a lista de ausentes para confirmação.
+    // Busca em lotes (a API do Supabase limita ~1000 linhas por requisição).
+    type AtivoRow = { id: string; marca: string; bandeira: string | null; last_contact: string | null; profiles: { full_name: string } | { full_name: string }[] | null };
+    const ativos: AtivoRow[] = [];
+    const lote = 1000;
+    for (let offset = 0; ; offset += lote) {
+      const { data: pagina } = await supabase
+        .from("clients")
+        .select("id, marca, bandeira, last_contact, csm_id, profiles:csm_id(full_name)")
+        .eq("status", "ativo")
+        .order("id")
+        .range(offset, offset + lote - 1);
+      if (!pagina || pagina.length === 0) break;
+      ativos.push(...(pagina as AtivoRow[]));
+      if (pagina.length < lote) break;
+    }
 
     const setBandeiras = new Set(bandeirasNaPlanilha.map(b => b.trim()));
-    const lista: AusenteCliente[] = (ativos ?? [])
-      .filter((c: { bandeira: string | null }) => !c.bandeira || !setBandeiras.has(c.bandeira.trim()))
-      .map((c: { id: string; marca: string; bandeira: string | null; last_contact: string | null; profiles: { full_name: string } | { full_name: string }[] | null }) => {
+    const lista: AusenteCliente[] = ativos
+      .filter((c) => !c.bandeira || !setBandeiras.has(c.bandeira.trim()))
+      .map((c) => {
         const prof = Array.isArray(c.profiles) ? c.profiles[0] : c.profiles;
         return {
           id: c.id,
@@ -142,7 +153,7 @@ export default function ImportarPage() {
       })
       .sort((a, b) => b.diasSemContato - a.diasSemContato);
 
-    setTotalAtivos((ativos ?? []).length);
+    setTotalAtivos(ativos.length);
     setAusentes(lista);
     setSelecionados(new Set(lista.map(c => c.id))); // todos marcados por padrão
     setRows(updated);
@@ -159,6 +170,15 @@ export default function ImportarPage() {
   }
   function marcarTodos() { setSelecionados(new Set(ausentes.map(c => c.id))); }
   function desmarcarTodos() { setSelecionados(new Set()); }
+
+  function cancelarPlanilha() {
+    setRows([]);
+    setDone(false);
+    setAusentes([]);
+    setInativacaoFeita(false);
+    setSelecionados(new Set());
+    setFileKey(k => k + 1);
+  }
 
   async function handleInativar() {
     if (selecionados.size === 0) return;
@@ -219,7 +239,7 @@ export default function ImportarPage() {
 
         <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <h3 className="font-medium text-gray-900 mb-4">Selecionar arquivo CSV</h3>
-          <input type="file" accept=".csv" onChange={handleFile} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+          <input key={fileKey} type="file" accept=".csv" onChange={handleFile} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
           <p className="text-xs text-gray-400 mt-2">Colunas: bandeira*, marca*, operacao*, csm*, cluster, plano</p>
         </div>
 
@@ -228,9 +248,14 @@ export default function ImportarPage() {
             <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
               <h3 className="font-medium text-gray-900">{rows.length} linhas encontradas</h3>
               {!done && (
-                <button onClick={handleImport} disabled={importing} className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                  {importing ? "Importando..." : "Confirmar importação"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={cancelarPlanilha} disabled={importing} className="text-xs text-gray-500 hover:text-gray-700 px-3 py-2 disabled:opacity-50">
+                    Cancelar
+                  </button>
+                  <button onClick={handleImport} disabled={importing} className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {importing ? "Importando..." : "Confirmar importação"}
+                  </button>
+                </div>
               )}
             </div>
             {done && (
