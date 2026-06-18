@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import type { Client } from "@/lib/types";
 import { useRouter, useParams } from "next/navigation";
 import { Info } from "lucide-react";
 
@@ -207,8 +209,8 @@ function ContactNote({ note }: { note: string }) {
 export default function ClientPage() {
   const router = useRouter();
   const { id } = useParams();
-  const [client, setClient] = useState<any>(null);
-  const [csm, setCsm] = useState<any>(null);
+  const [client, setClient] = useState<Client | null>(null);
+  const [csm, setCsm] = useState<{ full_name: string } | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [audit, setAudit] = useState<AuditLog[]>([]);
   const [features, setFeatures] = useState<Feature[]>([]);
@@ -229,7 +231,6 @@ export default function ClientPage() {
   const [openInfoId, setOpenInfoId] = useState<string | null>(null);
   const [auditLimit, setAuditLimit] = useState(10);
   const [form, setForm] = useState({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" });
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [showTentativaModal, setShowTentativaModal] = useState(false);
   const [tentativaForm, setTentativaForm] = useState({ date: new Date().toISOString().split("T")[0], canal: "whatsapp", note: "" });
   const [savingTentativa, setSavingTentativa] = useState(false);
@@ -251,13 +252,13 @@ export default function ClientPage() {
       .order("created_at", { ascending: false });
 
     if (data && data.length > 0) {
-      const userIds = [...new Set(data.map((d: any) => d.user_id))];
+      const userIds = [...new Set(data.map((d: { user_id: string }) => d.user_id))];
       const { data: profilesData } = await supabase
         .from("profiles")
         .select("id, full_name")
         .in("id", userIds);
-      const profileMap = Object.fromEntries((profilesData ?? []).map((p: any) => [p.id, p]));
-      setAudit(data.map((d: any) => ({ ...d, profiles: profileMap[d.user_id] ?? null })));
+      const profileMap = Object.fromEntries((profilesData ?? []).map((p: { id: string; full_name: string }) => [p.id, p]));
+      setAudit(data.map((d: { user_id: string }) => ({ ...d, profiles: profileMap[d.user_id] ?? { full_name: "—" } })) as unknown as AuditLog[]);
     } else {
       setAudit([]);
     }
@@ -335,7 +336,6 @@ export default function ClientPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
-      setCurrentUser(user);
 
       const { data: client } = await supabase
         .from("clients")
@@ -365,6 +365,8 @@ export default function ClientPage() {
       setLoading(false);
     }
     load();
+    // Carrega uma vez ao montar; as funções de load são estáveis neste contexto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   async function handleSaveTentativa() {
@@ -531,6 +533,8 @@ export default function ClientPage() {
     </div>
   );
 
+  if (!client) return null;
+
   const visibleFeatures = features.filter(
     f => !f.operacao || f.operacao === "ambos" || f.operacao === client.operacao
   );
@@ -542,7 +546,7 @@ export default function ClientPage() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
+          <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
@@ -838,7 +842,7 @@ export default function ClientPage() {
                         <li key={log.id} className="rounded-xl border border-slate-200/70 bg-white p-4 text-sm">
                           <div className="flex items-center justify-between mb-1">
                             <span className="font-medium text-gray-800">
-                              {(log.profiles as any)?.full_name} {log.action}
+                              {log.profiles?.full_name} {log.action}
                               {log.field ? ` — ${log.field}` : ""}
                             </span>
                             <span className="text-xs text-gray-400 shrink-0 ml-2">

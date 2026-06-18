@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import type { UserRole } from "@/lib/types";
 import { useRouter } from "next/navigation";
 
 type User = {
   id: string;
   full_name: string;
-  monthly_goal: number;
+  monthly_goal: number | null;
   roles: string[];
 };
 
@@ -34,12 +36,12 @@ export default function UsuariosPage() {
       .select("user_id, role");
 
     const rolesMap: Record<string, string[]> = {};
-    (roles ?? []).forEach((r: any) => {
+    (roles ?? []).forEach((r: UserRole) => {
       if (!rolesMap[r.user_id]) rolesMap[r.user_id] = [];
       rolesMap[r.user_id].push(r.role);
     });
 
-    setUsers((profiles ?? []).map((p: any) => ({
+    setUsers((profiles ?? []).map((p: { id: string; full_name: string; monthly_goal: number | null }) => ({
       ...p,
       roles: rolesMap[p.id] ?? [],
     })));
@@ -56,7 +58,7 @@ export default function UsuariosPage() {
       await loadUsers();
     }
     check();
-  }, []);
+  }, [router]);
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault();
@@ -127,7 +129,7 @@ export default function UsuariosPage() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
+          <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
@@ -168,7 +170,7 @@ export default function UsuariosPage() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <button
-                    onClick={() => { setEditingUser(user); setEditForm({ full_name: user.full_name, monthly_goal: user.monthly_goal }); }}
+                    onClick={() => { setEditingUser(user); setEditForm({ full_name: user.full_name, monthly_goal: user.monthly_goal ?? 49 }); }}
                     className="text-xs text-blue-500 hover:text-blue-700"
                   >
                     Editar

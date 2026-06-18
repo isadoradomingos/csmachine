@@ -39,7 +39,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Erro inesperado";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

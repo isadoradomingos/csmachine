@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import type { Profile, Client } from "@/lib/types";
 import { useRouter, useParams } from "next/navigation";
 
 export default function AdminCsmPage() {
   const router = useRouter();
   const { id } = useParams();
-  const [profile, setProfile] = useState<any>(null);
-  const [clients, setClients] = useState<any[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingGoal, setEditingGoal] = useState(false);
+  const [now] = useState(() => Date.now());
   const [newGoal, setNewGoal] = useState("");
   const [savingGoal, setSavingGoal] = useState(false);
   const [search, setSearch] = useState("");
@@ -41,7 +44,7 @@ export default function AdminCsmPage() {
       setLoading(false);
     }
     load();
-  }, [id]);
+  }, [id, router]);
 
   async function handleSaveGoal() {
     setSavingGoal(true);
@@ -49,14 +52,14 @@ export default function AdminCsmPage() {
       .from("profiles")
       .update({ monthly_goal: parseInt(newGoal) })
       .eq("id", id);
-    setProfile({ ...profile, monthly_goal: parseInt(newGoal) });
+    setProfile(profile ? { ...profile, monthly_goal: parseInt(newGoal) } : profile);
     setEditingGoal(false);
     setSavingGoal(false);
   }
 
   function daysSince(date: string | null): number {
     if (!date) return 999;
-    return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
+    return Math.floor((now - new Date(date).getTime()) / 86400000);
   }
 
   const filtered = clients.filter(c =>
@@ -85,7 +88,7 @@ export default function AdminCsmPage() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
+          <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>

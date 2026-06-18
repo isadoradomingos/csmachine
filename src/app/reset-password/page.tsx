@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -14,7 +15,7 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     // O Supabase processa o token da URL automaticamente
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
         setReady(true);
       }
@@ -70,7 +71,7 @@ export default function ResetPasswordPage() {
 
           {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 32 }}>
-            <img src="/machine-logo.png" alt="Machine" style={{ width: 32, height: 32, objectFit: "contain" }} />
+            <Image src="/machine-logo.png" alt="Machine" width={32} height={32} style={{ objectFit: "contain" }} />
             <span style={{ fontSize: 16, fontWeight: 700, color: "#111" }}>Machine</span>
           </div>
 

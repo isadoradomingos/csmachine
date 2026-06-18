@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -16,7 +17,8 @@ export default function LoginPage() {
   const [resetStatus, setResetStatus] = useState<"idle" | "success" | "notfound" | "loading">("idle");
 
   useEffect(() => {
-    setMounted(true);
+    const id = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
   async function handleReset(e: React.FormEvent) {
@@ -405,7 +407,7 @@ export default function LoginPage() {
           </svg>
 
           <div className="lr-logo">
-            <img src="/machine-logo.png" alt="Machine" className="lr-logo-icon" />
+            <Image src="/machine-logo.png" alt="Machine" width={36} height={36} className="lr-logo-icon" />
             <span className="lr-logo-name">Machine</span>
           </div>
 
@@ -428,7 +430,7 @@ export default function LoginPage() {
         {/* ── RIGHT ── */}
         <div className="lr-right">
           <div className="lr-form-logo">
-            <img src="/machine-logo.png" alt="Machine" style={{width:32,height:32,objectFit:"contain"}} />
+            <Image src="/machine-logo.png" alt="Machine" width={32} height={32} style={{objectFit:"contain"}} />
             <span style={{fontSize:16,fontWeight:700,color:"#111"}}>Machine</span>
           </div>
 

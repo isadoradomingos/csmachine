@@ -2,7 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import type { UserRole } from "@/lib/types";
 import { useRouter } from "next/navigation";
+
+type Stats = { csmCount: number; totalClients: number; totalContacts: number; metaPercent: number };
+type ClienteResumo = { id: string; marca: string; bandeira: string | null; operacao: string; csm_id: string | null };
+type ContatoCliente = { csm_id: string | null };
+type ContatoComCliente = { id: string; client_id: string; date: string; type: string; clients?: ContatoCliente | ContatoCliente[] | null };
 
 type User = {
   id: string;
@@ -15,14 +22,14 @@ type User = {
 export default function AdminPage() {
   const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState<any>({});
+  const [stats, setStats] = useState<Stats>({ csmCount: 0, totalClients: 0, totalContacts: 0, metaPercent: 0 });
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [activeModal, setActiveModal] = useState<"csms" | "clientes" | "contatos" | "meta" | null>(null);
-  const [allClients, setAllClients] = useState<any[]>([]);
+  const [allClients, setAllClients] = useState<ClienteResumo[]>([]);
   const [clientSearch, setClientSearch] = useState("");
   const [contatoFilterCSM, setContatoFilterCSM] = useState("");
-  const [contatosList, setContatosList] = useState<any[]>([]);
+  const [contatosList, setContatosList] = useState<ContatoComCliente[]>([]);
   const [contatosCSMMap, setContatosCSMMap] = useState<Record<string, number>>({});
   const [inviteForm, setInviteForm] = useState({ full_name: "", email: "", role: "csm", monthly_goal: 49 });
   const [inviting, setInviting] = useState(false);
@@ -37,29 +44,29 @@ export default function AdminPage() {
       .from("user_roles")
       .select("user_id, role");
 
-    const isAdmin = (roles ?? []).some((r: any) => r.user_id === user.id && r.role === "admin");
+    const isAdmin = (roles ?? []).some((r: UserRole) => r.user_id === user.id && r.role === "admin");
     if (!isAdmin) { router.push("/dashboard"); return; }
 
-    const allUserIds = [...new Set((roles ?? []).map((r: any) => r.user_id))];
+    const allUserIds = [...new Set((roles ?? []).map((r: UserRole) => r.user_id))];
     const { data: profiles } = await supabase
       .from("profiles")
       .select("*")
       .in("id", allUserIds);
 
     const rolesMap: Record<string, string[]> = {};
-    (roles ?? []).forEach((r: any) => {
+    (roles ?? []).forEach((r: UserRole) => {
       if (!rolesMap[r.user_id]) rolesMap[r.user_id] = [];
       rolesMap[r.user_id].push(r.role);
     });
 
-    setUsers((profiles ?? []).map((p: any) => ({
+    setUsers((profiles ?? []).map((p: { id: string; full_name: string; monthly_goal: number | null; ativo?: boolean }) => ({
       ...p,
       roles: rolesMap[p.id] ?? [],
       ativo: p.ativo !== false,
     })));
 
     // Stats gerais
-    const csmIds = (roles ?? []).filter((r: any) => r.role === "csm").map((r: any) => r.user_id);
+    const csmIds = (roles ?? []).filter((r: UserRole) => r.role === "csm").map((r: UserRole) => r.user_id);
     const { count: totalClients } = await supabase
       .from("clients")
       .select("*", { count: "exact", head: true })
@@ -78,7 +85,7 @@ export default function AdminPage() {
       .select("monthly_goal")
       .in("id", csmIds);
 
-    const totalGoal = (profilesForGoal ?? []).reduce((acc: number, p: any) => acc + (p.monthly_goal ?? 49), 0);
+    const totalGoal = (profilesForGoal ?? []).reduce((acc: number, p: { monthly_goal: number | null }) => acc + (p.monthly_goal ?? 49), 0);
     const metaPercent = totalGoal > 0 ? Math.round(((totalContacts ?? 0) / totalGoal) * 100) : 0;
 
     setStats({
@@ -90,7 +97,7 @@ export default function AdminPage() {
 
     // Buscar todos os clientes ativos
     // Buscar todos os clientes em batches de 1000
-    let allClientsData: any[] = [];
+    let allClientsData: ClienteResumo[] = [];
     let from = 0;
     while (true) {
       const { data: batch } = await supabase
@@ -116,8 +123,9 @@ export default function AdminPage() {
     setContatosList(contatosMes ?? []);
 
     const csmContactMap: Record<string, number> = {};
-    (contatosMes ?? []).forEach((c: any) => {
-      const csmId = c.clients?.csm_id;
+    (contatosMes ?? []).forEach((c: ContatoComCliente) => {
+      const cl = Array.isArray(c.clients) ? c.clients[0] : c.clients;
+      const csmId = cl?.csm_id;
       if (csmId) csmContactMap[csmId] = (csmContactMap[csmId] ?? 0) + 1;
     });
     setContatosCSMMap(csmContactMap);
@@ -126,6 +134,8 @@ export default function AdminPage() {
   }, [router]);
 
   useEffect(() => {
+    // load() é async; setState ocorre após await, não é síncrono.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -169,7 +179,7 @@ export default function AdminPage() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
+          <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <div className="flex items-center gap-4">
@@ -345,15 +355,16 @@ export default function AdminPage() {
             </div>
             <div className="px-6 py-2 border-b border-slate-200/60">
               <span className="text-xs text-gray-400">
-                {contatosList.filter((c: any) => !contatoFilterCSM || c.clients?.csm_id === contatoFilterCSM).length} consultorias de produto realizadas
+                {contatosList.filter((c: ContatoComCliente) => { const cl = Array.isArray(c.clients) ? c.clients[0] : c.clients; return !contatoFilterCSM || cl?.csm_id === contatoFilterCSM; }).length} consultorias de produto realizadas
               </span>
             </div>
             <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
               {contatosList
-                .filter((c: any) => !contatoFilterCSM || c.clients?.csm_id === contatoFilterCSM)
-                .map((c: any) => {
+                .filter((c: ContatoComCliente) => { const cl = Array.isArray(c.clients) ? c.clients[0] : c.clients; return !contatoFilterCSM || cl?.csm_id === contatoFilterCSM; })
+                .map((c: ContatoComCliente) => {
                   const client = allClients.find(cl => cl.id === c.client_id);
-                  const csm = users.find(u => u.id === c.clients?.csm_id);
+                  const cl = Array.isArray(c.clients) ? c.clients[0] : c.clients;
+                  const csm = users.find(u => u.id === cl?.csm_id);
                   return (
                     <li key={c.id} onClick={() => { setActiveModal(null); router.push(`/clients/${c.client_id}`); }} className="px-6 py-3 hover:bg-slate-100 cursor-pointer transition-colors">
                       <div className="flex items-center justify-between">

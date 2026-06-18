@@ -2,12 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import type { Profile, Client } from "@/lib/types";
 import { useRouter } from "next/navigation";
+
+type ConsultoriaCliente = { id: string; marca: string; bandeira: string | null; csm_id: string | null };
+type ConsultoriaMes = { client_id: string; date: string; clients: ConsultoriaCliente | ConsultoriaCliente[] | null };
+type ContatoMin = { client_id: string; date: string; type: string };
 
 type ModalClient = {
   id: string;
   marca: string;
-  bandeira: string;
+  bandeira: string | null;
   last_contact: string | null;
   daysSinceContact: number;
   tentativasSemRetorno?: number;
@@ -15,8 +21,8 @@ type ModalClient = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [profile, setProfile] = useState<any>(null);
-  const [clients, setClients] = useState<any[]>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterOperacao, setFilterOperacao] = useState("");
@@ -27,7 +33,7 @@ export default function DashboardPage() {
   const [consultoriasSet, setConsultoriasSet] = useState<Set<string>>(new Set());
   const [semHistoricoSet, setSemHistoricoSet] = useState<Set<string>>(new Set());
   const [semRetornoClients, setSemRetornoClients] = useState<ModalClient[]>([]);
-  const [consultoriasMes, setConsultoriasMes] = useState<any[]>([]);
+  const [consultoriasMes, setConsultoriasMes] = useState<ConsultoriaMes[]>([]);
   const [modal, setModal] = useState<{ type: "followup" | "semretorno" | "consultorias" } | null>(null);
 
   // Estados do modal de follow-up
@@ -84,7 +90,7 @@ export default function DashboardPage() {
       .gte("date", thirtyDaysAgo.toISOString().split("T")[0]);
 
     const tentMap: Record<string, number> = {};
-    (tentativas ?? []).forEach((t: any) => {
+    (tentativas ?? []).forEach((t: { client_id: string }) => {
       tentMap[t.client_id] = (tentMap[t.client_id] ?? 0) + 1;
     });
     setTentativasMap(tentMap);
@@ -95,37 +101,37 @@ export default function DashboardPage() {
       .eq("type", "consultoria_produto")
       .gte("date", thirtyDaysAgo.toISOString().split("T")[0]);
 
-    const consultSet = new Set((consultorias ?? []).map((c: any) => c.client_id));
+    const consultSet = new Set((consultorias ?? []).map((c: { client_id: string }) => c.client_id));
     setConsultoriasSet(consultSet);
 
     const { data: todosContatos } = await supabase
       .from("client_contacts")
       .select("client_id");
 
-    const comHistorico = new Set((todosContatos ?? []).map((c: any) => c.client_id));
-    const semHistorico = new Set((clients ?? []).map((c: any) => c.id).filter((id: string) => !comHistorico.has(id)));
+    const comHistorico = new Set((todosContatos ?? []).map((c: { client_id: string }) => c.client_id));
+    const semHistorico = new Set((clients ?? []).map((c: Client) => c.id).filter((id: string) => !comHistorico.has(id)));
     setSemHistoricoSet(semHistorico);
 
     // Calcular clientes com 3+ tentativas de contato sem retorno
     const { data: allContacts } = await supabase
       .from("client_contacts")
       .select("client_id, date, type")
-      .in("client_id", (clients ?? []).map((c: any) => c.id))
+      .in("client_id", (clients ?? []).map((c: Client) => c.id))
       .order("date", { ascending: false });
 
     const semRetorno: ModalClient[] = [];
-    const clientContactsMap: Record<string, any[]> = {};
-    (allContacts ?? []).forEach((c: any) => {
+    const clientContactsMap: Record<string, ContatoMin[]> = {};
+    (allContacts ?? []).forEach((c: ContatoMin) => {
       if (!clientContactsMap[c.client_id]) clientContactsMap[c.client_id] = [];
       clientContactsMap[c.client_id].push(c);
     });
 
-    (clients ?? []).forEach((client: any) => {
+    (clients ?? []).forEach((client: Client) => {
       const contatos = clientContactsMap[client.id] ?? [];
-      const ultimoEfetivo = contatos.find((c: any) => c.type === "efetivo" || c.type === "consultoria_produto");
+      const ultimoEfetivo = contatos.find((c: ContatoMin) => c.type === "efetivo" || c.type === "consultoria_produto");
       const tentativasApos = ultimoEfetivo
-        ? contatos.filter((c: any) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
-        : contatos.filter((c: any) => c.type === "tentativa");
+        ? contatos.filter((c: ContatoMin) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
+        : contatos.filter((c: ContatoMin) => c.type === "tentativa");
 
       if (tentativasApos.length >= 3) {
         semRetorno.push({
@@ -144,6 +150,8 @@ export default function DashboardPage() {
   }, [router]);
 
   useEffect(() => {
+    // load() é async; os setState ocorrem após await, não são síncronos.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     window.addEventListener("focus", load);
     return () => window.removeEventListener("focus", load);
@@ -210,7 +218,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
+          <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <div className="flex items-center gap-4">
@@ -311,7 +319,7 @@ export default function DashboardPage() {
             <option value="growth_touch">Growth Touch</option>
             <option value="no_touch">No Touch</option>
           </select>
-          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as any)} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "" | "recente" | "antigo")} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
             <option value="">Ordem de contato</option>
             <option value="recente">Contato mais recente</option>
             <option value="antigo">Contato mais antigo</option>
@@ -403,7 +411,7 @@ export default function DashboardPage() {
                   <option value="desc">Mais antigos primeiro</option>
                   <option value="asc">Mais recentes primeiro</option>
                 </select>
-                <select value={modalFilterType} onChange={e => setModalFilterType(e.target.value as any)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs bg-white focus:outline-none">
+                <select value={modalFilterType} onChange={e => setModalFilterType(e.target.value as "mais" | "menos" | "entre")} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs bg-white focus:outline-none">
                   <option value="mais">Mais de X dias</option>
                   <option value="menos">Menos de X dias</option>
                   <option value="entre">Entre X e Y dias</option>

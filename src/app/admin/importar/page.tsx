@@ -39,7 +39,6 @@ type AusenteCliente = {
 export default function ImportarPage() {
   const router = useRouter();
   const [rows, setRows] = useState<ImportRow[]>([]);
-  const [profiles, setProfiles] = useState<{ id: string; full_name: string }[]>([]);
   const [fileKey, setFileKey] = useState(0);
 
   const [analisando, setAnalisando] = useState(false);
@@ -111,7 +110,6 @@ export default function ImportarPage() {
 
     const { data: p } = await supabase.from("profiles").select("id, full_name");
     const profs = p ?? [];
-    setProfiles(profs);
 
     const analisadas: ImportRow[] = [];
     const bandeirasNaPlanilha: string[] = [];

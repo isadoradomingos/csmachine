@@ -2,14 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
+import type { Profile, Client, ModalClient } from "@/lib/types";
 import { useRouter, useParams } from "next/navigation";
 
 export default function AdminUsuarioPage() {
   const router = useRouter();
   const { id } = useParams();
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [contactCount, setContactCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -18,9 +20,9 @@ export default function AdminUsuarioPage() {
   const [sortOrder, setSortOrder] = useState<"" | "recente" | "antigo">("");
   const [followUpCount, setFollowUpCount] = useState(0);
   const [semRetornoCount, setSemRetornoCount] = useState(0);
-  const [semRetornoClients, setSemRetornoClients] = useState<any[]>([]);
+  const [semRetornoClients, setSemRetornoClients] = useState<ModalClient[]>([]);
   const [showEdit, setShowEdit] = useState(false);
-  const [modal, setModal] = useState<{ title: string; clients: any[] } | null>(null);
+  const [modal, setModal] = useState<{ title: string; clients: ModalClient[] } | null>(null);
   const [modalSearch, setModalSearch] = useState("");
   const [modalOrder, setModalOrder] = useState<"asc" | "desc">("desc");
   const [modalFilterType, setModalFilterType] = useState<"mais" | "menos" | "entre">("mais");
@@ -56,7 +58,7 @@ export default function AdminUsuarioPage() {
       .from("user_roles")
       .select("role")
       .eq("user_id", id);
-    const roleList = (userRoles ?? []).map((r: any) => r.role);
+    const roleList = (userRoles ?? []).map((r: { role: string }) => r.role);
     setRoles(roleList);
 
     const { data: clients } = await supabase
@@ -78,47 +80,56 @@ export default function AdminUsuarioPage() {
       .gte("date", startOfMonth.toISOString().split("T")[0]);
     setContactCount(count ?? 0);
 
-    const followUp = (clients ?? []).filter((c: any) => daysSince(c.last_contact) > 20).length;
+    const followUp = (clients ?? []).filter((c: Client) => daysSince(c.last_contact) > 20).length;
     setFollowUpCount(followUp);
 
     // Calcular Tentativas de contato sem retorno
     const { data: allContacts } = await supabase
       .from("client_contacts")
       .select("client_id, date, type")
-      .in("client_id", (clients ?? []).map((c: any) => c.id))
+      .in("client_id", (clients ?? []).map((c: Client) => c.id))
       .order("date", { ascending: false });
 
-    const clientContactsMap: Record<string, any[]> = {};
-    (allContacts ?? []).forEach((c: any) => {
+    type ContatoMin = { client_id: string; date: string; type: string };
+    const clientContactsMap: Record<string, ContatoMin[]> = {};
+    (allContacts ?? []).forEach((c: ContatoMin) => {
       if (!clientContactsMap[c.client_id]) clientContactsMap[c.client_id] = [];
       clientContactsMap[c.client_id].push(c);
     });
 
     let semRetorno = 0;
-    (clients ?? []).forEach((client: any) => {
+    (clients ?? []).forEach((client: Client) => {
       const contatos = clientContactsMap[client.id] ?? [];
-      const ultimoEfetivo = contatos.find((c: any) => c.type === "efetivo" || c.type === "consultoria_produto");
+      const ultimoEfetivo = contatos.find((c: ContatoMin) => c.type === "efetivo" || c.type === "consultoria_produto");
       const tentativasApos = ultimoEfetivo
-        ? contatos.filter((c: any) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
-        : contatos.filter((c: any) => c.type === "tentativa");
+        ? contatos.filter((c: ContatoMin) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
+        : contatos.filter((c: ContatoMin) => c.type === "tentativa");
       if (tentativasApos.length >= 3) semRetorno++;
     });
     setSemRetornoCount(semRetorno);
 
-    const semRetornoList = (clients ?? []).filter((client: any) => {
+    const semRetornoList = (clients ?? []).filter((client: Client) => {
       const contatos = clientContactsMap[client.id] ?? [];
-      const ultimoEfetivo = contatos.find((c: any) => c.type === "efetivo" || c.type === "consultoria_produto");
+      const ultimoEfetivo = contatos.find((c: ContatoMin) => c.type === "efetivo" || c.type === "consultoria_produto");
       const tentativasApos = ultimoEfetivo
-        ? contatos.filter((c: any) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
-        : contatos.filter((c: any) => c.type === "tentativa");
+        ? contatos.filter((c: ContatoMin) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
+        : contatos.filter((c: ContatoMin) => c.type === "tentativa");
       return tentativasApos.length >= 3;
-    });
+    }).map((client: Client): ModalClient => ({
+      id: client.id,
+      marca: client.marca,
+      bandeira: client.bandeira,
+      last_contact: client.last_contact,
+      daysSinceContact: daysSince(client.last_contact),
+    }));
     setSemRetornoClients(semRetornoList);
 
     setLoading(false);
   }, [id, router]);
 
   useEffect(() => {
+    // load() é async; setState ocorre após await, não é síncrono.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -213,7 +224,7 @@ export default function AdminUsuarioPage() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src="/machine-logo.png" alt="Machine" className="h-8 w-8 object-contain" />
+          <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
@@ -354,7 +365,7 @@ export default function AdminUsuarioPage() {
               <option value="growth_touch">Growth Touch</option>
               <option value="no_touch">No Touch</option>
             </select>
-            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as any)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none">
+            <select value={sortOrder} onChange={e => setSortOrder(e.target.value as "" | "recente" | "antigo")} className="rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none">
               <option value="">Ordem de contato</option>
               <option value="recente">Contato mais recente</option>
               <option value="antigo">Contato mais antigo</option>
@@ -412,7 +423,7 @@ export default function AdminUsuarioPage() {
                     <option value="desc">Mais antigos primeiro</option>
                     <option value="asc">Mais recentes primeiro</option>
                   </select>
-                  <select value={modalFilterType} onChange={e => setModalFilterType(e.target.value as any)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs bg-white focus:outline-none">
+                  <select value={modalFilterType} onChange={e => setModalFilterType(e.target.value as "mais" | "menos" | "entre")} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs bg-white focus:outline-none">
                     <option value="mais">Mais de X dias</option>
                     <option value="menos">Menos de X dias</option>
                     <option value="entre">Entre X e Y dias</option>
@@ -442,12 +453,12 @@ export default function AdminUsuarioPage() {
               <span className="text-xs text-gray-400">
                 {(() => {
                   let list = modal.clients;
-                  if (modalSearch) list = list.filter((c: any) => c.marca.toLowerCase().includes(modalSearch.toLowerCase()) || c.bandeira?.includes(modalSearch));
+                  if (modalSearch) list = list.filter((c: ModalClient) => c.marca.toLowerCase().includes(modalSearch.toLowerCase()) || c.bandeira?.includes(modalSearch));
                   if (modal.title === "Oportunidades de follow-up" && modalFilterDays) {
                     const d1 = parseInt(modalFilterDays);
                     const d2 = parseInt(modalFilterDays2);
                     if (!isNaN(d1)) {
-                      list = list.filter((c: any) => {
+                      list = list.filter((c: ModalClient) => {
                         const days = daysSince(c.last_contact);
                         if (modalFilterType === "mais") return days > d1;
                         if (modalFilterType === "menos") return days < d1;
@@ -464,12 +475,12 @@ export default function AdminUsuarioPage() {
             <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
               {(() => {
                 let list = [...modal.clients];
-                if (modalSearch) list = list.filter((c: any) => c.marca.toLowerCase().includes(modalSearch.toLowerCase()) || c.bandeira?.includes(modalSearch));
+                if (modalSearch) list = list.filter((c: ModalClient) => c.marca.toLowerCase().includes(modalSearch.toLowerCase()) || c.bandeira?.includes(modalSearch));
                 if (modal.title === "Oportunidades de follow-up") {
                   const d1 = parseInt(modalFilterDays);
                   const d2 = parseInt(modalFilterDays2);
                   if (!isNaN(d1)) {
-                    list = list.filter((c: any) => {
+                    list = list.filter((c: ModalClient) => {
                       const days = daysSince(c.last_contact);
                       if (modalFilterType === "mais") return days > d1;
                       if (modalFilterType === "menos") return days < d1;
@@ -477,13 +488,13 @@ export default function AdminUsuarioPage() {
                       return true;
                     });
                   }
-                  list.sort((a: any, b: any) => modalOrder === "desc"
+                  list.sort((a: ModalClient, b: ModalClient) => modalOrder === "desc"
                     ? daysSince(b.last_contact) - daysSince(a.last_contact)
                     : daysSince(a.last_contact) - daysSince(b.last_contact)
                   );
                 }
                 if (list.length === 0) return [<li key="empty" className="px-6 py-8 text-center text-sm text-gray-400">Nenhum cliente encontrado.</li>];
-                return list.map((c: any) => (
+                return list.map((c: ModalClient) => (
                   <li key={c.id} onClick={() => { setModal(null); router.push(`/clients/${c.id}`); }} className="px-6 py-4 hover:bg-slate-100 cursor-pointer transition-colors">
                     <div className="flex items-center justify-between">
                       <div>
