@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import type { Client } from "@/lib/types";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Info } from "lucide-react";
 
 type Contact = {
@@ -209,6 +209,9 @@ function ContactNote({ note }: { note: string }) {
 export default function ClientPage() {
   const router = useRouter();
   const { id } = useParams();
+  const searchParams = useSearchParams();
+  const contatoAlvo = searchParams.get("contato");
+  const [destacado, setDestacado] = useState<string | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [csm, setCsm] = useState<{ full_name: string } | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -368,6 +371,22 @@ export default function ClientPage() {
     // Carrega uma vez ao montar; as funções de load são estáveis neste contexto.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Se veio de um link com ?contato=ID, abre a aba contatos, rola até o registro e o destaca
+  useEffect(() => {
+    if (!contatoAlvo || contacts.length === 0) return;
+    if (!contacts.some(c => c.id === contatoAlvo)) return;
+    const t = setTimeout(() => {
+      setActiveTab("contatos");
+      const el = document.getElementById(`contato-${contatoAlvo}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setDestacado(contatoAlvo);
+        setTimeout(() => setDestacado(null), 2600);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [contatoAlvo, contacts]);
 
   async function handleSaveTentativa() {
     setSavingTentativa(true);
@@ -659,7 +678,15 @@ export default function ClientPage() {
                 ) : (
                   <ol className="space-y-3">
                     {contacts.map((c) => (
-                      <li key={c.id} className="rounded-xl border border-slate-200/70 bg-white p-4">
+                      <li
+                        key={c.id}
+                        id={`contato-${c.id}`}
+                        className={`rounded-xl border p-4 transition-colors duration-500 ${
+                          destacado === c.id
+                            ? "border-blue-400 bg-blue-50 ring-2 ring-blue-200"
+                            : "border-slate-200/70 bg-white"
+                        }`}
+                      >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${typeColor[c.type]}`}>

@@ -5,6 +5,9 @@ import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import type { UserRole } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import AdminAnalytics, { SeletorPeriodo, SeletorCsm, type Preset, type CsmOpt, type DetalheContato } from "@/components/AdminAnalytics";
+import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
+import RankingCsm from "@/components/RankingCsm";
 
 type Stats = { csmCount: number; totalClients: number; totalContacts: number; metaPercent: number };
 type ClienteResumo = { id: string; marca: string; bandeira: string | null; operacao: string; csm_id: string | null };
@@ -25,16 +28,26 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Stats>({ csmCount: 0, totalClients: 0, totalContacts: 0, metaPercent: 0 });
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
-  const [activeModal, setActiveModal] = useState<"csms" | "clientes" | "contatos" | "meta" | null>(null);
+  const [activeModal, setActiveModal] = useState<"clientes" | "contatos" | "meta" | null>(null);
   const [allClients, setAllClients] = useState<ClienteResumo[]>([]);
   const [clientSearch, setClientSearch] = useState("");
-  const [contatoFilterCSM, setContatoFilterCSM] = useState("");
-  const [contatosList, setContatosList] = useState<ContatoComCliente[]>([]);
   const [contatosCSMMap, setContatosCSMMap] = useState<Record<string, number>>({});
   const [inviteForm, setInviteForm] = useState({ full_name: "", email: "", role: "csm", monthly_goal: 49 });
   const [inviting, setInviting] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<"idle" | "success" | "error">("idle");
   const [inviteError, setInviteError] = useState("");
+  // Filtros da análise (ficam no topo, ao lado de Importar planilha)
+  const [preset, setPreset] = useState<Preset>("ultimos_30");
+  const [custom, setCustom] = useState({ de: "", ate: "" });
+  const [csmFiltro, setCsmFiltro] = useState("");
+  const [csmOpcoes, setCsmOpcoes] = useState<CsmOpt[]>([]);
+  const [abaAtiva, setAbaAtiva] = useState<"visao" | "analises" | "time">("visao");
+  const [totalRealizados, setTotalRealizados] = useState(0);
+  const [listaRealizados, setListaRealizados] = useState<DetalheContato[]>([]);
+  const handleRealizados = useCallback((total: number, lista: DetalheContato[]) => {
+    setTotalRealizados(total);
+    setListaRealizados(lista);
+  }, []);
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -120,7 +133,6 @@ export default function AdminPage() {
       .eq("type", "consultoria_produto")
       .gte("date", startOfMonth.toISOString().split("T")[0]);
 
-    setContatosList(contatosMes ?? []);
 
     const csmContactMap: Record<string, number> = {};
     (contatosMes ?? []).forEach((c: ContatoComCliente) => {
@@ -194,104 +206,143 @@ export default function AdminPage() {
             <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Administração</p>
             <h2 className="text-2xl font-semibold text-white mt-1">Visão geral do time</h2>
           </div>
-          <button
-            onClick={() => router.push("/admin/importar")}
-            className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
-            style={{ background: "#16a34a", color: "white" }}
-            onMouseOver={e => (e.currentTarget.style.background = "#15803d")}
-            onMouseOut={e => (e.currentTarget.style.background = "#16a34a")}
-          >
-            ↑ Importar planilha
-          </button>
-        </div>
-
-        {/* Cards gerais */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 mb-8">
-          <div onClick={() => setActiveModal("csms")} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
-            <p className="text-xs text-gray-400 mb-2">CSMs ativos</p>
-            <p className="text-3xl font-semibold text-gray-900">{stats.csmCount}</p>
-          </div>
-          <div onClick={() => { setClientSearch(""); setActiveModal("clientes"); }} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
-            <p className="text-xs text-gray-400 mb-2">Clientes na carteira</p>
-            <p className="text-3xl font-semibold text-gray-900">{stats.totalClients}</p>
-          </div>
-          <div onClick={() => { setContatoFilterCSM(""); setActiveModal("contatos"); }} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
-            <p className="text-xs text-gray-400 mb-2">Consultorias de Produto no mês</p>
-            <p className="text-3xl font-semibold text-gray-900">{stats.totalContacts}</p>
-          </div>
-          <div onClick={() => setActiveModal("meta")} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
-            <p className="text-xs text-gray-400 mb-2">Meta coletiva</p>
-            <p className="text-3xl font-semibold text-gray-900">{stats.metaPercent}%</p>
-          </div>
-        </div>
-
-        {/* Lista de usuários */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
-            <h3 className="font-medium text-gray-900">Usuários</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <SeletorPeriodo preset={preset} setPreset={setPreset} custom={custom} setCustom={setCustom} />
             <button
-              onClick={() => { setShowInvite(true); setInviteStatus("idle"); }}
-              className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={() => router.push("/admin/importar")}
+              className="text-sm px-4 py-2 rounded-lg transition-colors font-medium"
+              style={{ background: "#16a34a", color: "white" }}
+              onMouseOver={e => (e.currentTarget.style.background = "#15803d")}
+              onMouseOut={e => (e.currentTarget.style.background = "#16a34a")}
             >
-              + Adicionar usuário
+              ↑ Importar planilha
             </button>
           </div>
-          <ul className="divide-y divide-slate-200/60">
-            {users.map((u) => (
-              <li
-                key={u.id}
-                onClick={() => router.push(`/admin/usuario/${u.id}`)}
-                className={`px-6 py-4 flex items-center justify-between cursor-pointer transition-colors ${u.ativo === false ? "bg-slate-100 opacity-60" : "hover:bg-slate-100"}`}
+        </div>
+
+        {/* Navegação de abas */}
+        <div className="flex gap-1 mb-6 border-b border-slate-700">
+          {([
+            { id: "visao", label: "Visão geral" },
+            { id: "analises", label: "Análises" },
+            { id: "time", label: "Time" },
+          ] as const).map(aba => (
+            <button
+              key={aba.id}
+              onClick={() => setAbaAtiva(aba.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                abaAtiva === aba.id
+                  ? "border-blue-500 text-white"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {aba.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ===== ABA: VISÃO GERAL ===== */}
+        {abaAtiva === "visao" && (
+          <>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-8">
+              <div onClick={() => { setClientSearch(""); setActiveModal("clientes"); }} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
+                <p className="text-xs text-gray-400 mb-2">Clientes na carteira</p>
+                <p className="text-3xl font-semibold text-gray-900">{stats.totalClients}</p>
+              </div>
+              <div onClick={() => setActiveModal("contatos")} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
+                <p className="text-xs text-gray-400 mb-2">Contatos realizados</p>
+                <p className="text-3xl font-semibold text-gray-900">{totalRealizados}</p>
+              </div>
+              <div onClick={() => setActiveModal("meta")} className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer hover:shadow-md transition-shadow">
+                <p className="text-xs text-gray-400 mb-2">Meta coletiva</p>
+                <p className="text-3xl font-semibold text-gray-900">{stats.metaPercent}%</p>
+              </div>
+            </div>
+
+            {/* Filtro de CSM (local) + gráfico de série temporal */}
+            <div className="flex justify-end mb-3">
+              <SeletorCsm csmFiltro={csmFiltro} setCsmFiltro={setCsmFiltro} opcoes={csmOpcoes} />
+            </div>
+            <AdminAnalytics preset={preset} custom={custom} csmFiltro={csmFiltro} onOpcoesCsm={setCsmOpcoes} onTotalRealizados={handleRealizados} />
+          </>
+        )}
+
+        {/* ===== ABA: ANÁLISES ===== */}
+        {abaAtiva === "analises" && (
+          <div className="space-y-6">
+            <DistribuicaoCarteira />
+            <RankingCsm preset={preset} custom={custom} />
+
+            {/* Placeholder: Saúde dos clientes */}
+            <div className="bg-slate-50/60 rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+              <p className="text-sm font-semibold text-gray-500">Saúde dos clientes (Health Score)</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
+                Em breve. Vai substituir a aba de diagnóstico por um health score com novos parâmetros,
+                permitindo visualizar a saúde da carteira por faixa (saudável, em risco, crítico).
+              </p>
+              <span className="inline-block mt-3 text-xs px-3 py-1 rounded-full bg-slate-200 text-slate-500 font-medium">Em breve</span>
+            </div>
+
+            {/* Placeholder: KPIs do CS */}
+            <div className="bg-slate-50/60 rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+              <p className="text-sm font-semibold text-gray-500">KPIs do CS</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
+                Em breve. Indicadores-chave de Customer Success alimentados por dados importados via planilha.
+                Futuramente também disponíveis no painel de cada CSM.
+              </p>
+              <span className="inline-block mt-3 text-xs px-3 py-1 rounded-full bg-slate-200 text-slate-500 font-medium">Em breve</span>
+            </div>
+          </div>
+        )}
+
+        {/* ===== ABA: TIME ===== */}
+        {abaAtiva === "time" && (
+          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
+              <h3 className="font-medium text-gray-900">Usuários</h3>
+              <button
+                onClick={() => { setShowInvite(true); setInviteStatus("idle"); }}
+                className="text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${u.ativo === false ? "bg-gray-200 text-gray-500" : "bg-blue-100 text-blue-700"}`}>
-                    {u.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
-                  </div>
-                  <div>
-                    <p className={`font-medium ${u.ativo === false ? "text-gray-400" : "text-gray-900"}`}>{u.full_name}</p>
-                    <div className="flex gap-1.5 mt-0.5">
-                      {u.roles.map(r => (
-                        <span key={r} className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(r)}`}>
-                          {roleLabel(r)}
-                        </span>
-                      ))}
-                      {u.ativo === false && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">
-                          Inativo
-                        </span>
-                      )}
+                + Adicionar usuário
+              </button>
+            </div>
+            <ul className="divide-y divide-slate-200/60">
+              {users.map((u) => (
+                <li
+                  key={u.id}
+                  onClick={() => router.push(`/admin/usuario/${u.id}`)}
+                  className={`px-6 py-4 flex items-center justify-between cursor-pointer transition-colors ${u.ativo === false ? "bg-slate-100 opacity-60" : "hover:bg-slate-100"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${u.ativo === false ? "bg-gray-200 text-gray-500" : "bg-blue-100 text-blue-700"}`}>
+                      {u.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
+                    </div>
+                    <div>
+                      <p className={`font-medium ${u.ativo === false ? "text-gray-400" : "text-gray-900"}`}>{u.full_name}</p>
+                      <div className="flex gap-1.5 mt-0.5">
+                        {u.roles.map(r => (
+                          <span key={r} className={`text-xs px-2 py-0.5 rounded-full font-medium ${roleColor(r)}`}>
+                            {roleLabel(r)}
+                          </span>
+                        ))}
+                        {u.ativo === false && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-gray-200 text-gray-500">
+                            Inativo
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <span className="text-xs text-gray-400">→</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </main>
-
-      {/* Modal CSMs ativos */}
-      {activeModal === "csms" && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setActiveModal(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">CSMs ativos</h3>
-              <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
-            </div>
-            <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
-              {users.filter(u => u.roles.includes("csm")).map(u => (
-                <li key={u.id} onClick={() => { setActiveModal(null); router.push(`/admin/usuario/${u.id}`); }} className="px-6 py-4 flex items-center gap-3 hover:bg-slate-100 cursor-pointer transition-colors">
-                  <div className="h-8 w-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-semibold shrink-0">
-                    {u.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
-                  </div>
-                  <p className="font-medium text-gray-900 text-sm">{u.full_name}</p>
+                  <span className="text-xs text-gray-400">→</span>
                 </li>
               ))}
             </ul>
           </div>
-        </div>
-      )}
+        )}
+      </main>
 
+      {/* Modal CSMs ativos */}
       {/* Modal Clientes na carteira */}
       {activeModal === "clientes" && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setActiveModal(null)}>
@@ -338,47 +389,26 @@ export default function AdminPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setActiveModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Consultorias de Produto no mês</h3>
+              <div>
+                <h3 className="font-semibold text-gray-900">Contatos realizados</h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {listaRealizados.length} contato(s) no período{csmFiltro ? " · CSM filtrado" : ""} · exceto tentativas
+                </p>
+              </div>
               <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
             </div>
-            <div className="px-6 py-3 border-b border-slate-200/60">
-              <select
-                value={contatoFilterCSM}
-                onChange={e => setContatoFilterCSM(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Todos os CSMs</option>
-                {users.filter(u => u.roles.includes("csm")).map(u => (
-                  <option key={u.id} value={u.id}>{u.full_name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="px-6 py-2 border-b border-slate-200/60">
-              <span className="text-xs text-gray-400">
-                {contatosList.filter((c: ContatoComCliente) => { const cl = Array.isArray(c.clients) ? c.clients[0] : c.clients; return !contatoFilterCSM || cl?.csm_id === contatoFilterCSM; }).length} consultorias de produto realizadas
-              </span>
-            </div>
             <ul className="divide-y divide-slate-200/60 overflow-y-auto flex-1">
-              {contatosList
-                .filter((c: ContatoComCliente) => { const cl = Array.isArray(c.clients) ? c.clients[0] : c.clients; return !contatoFilterCSM || cl?.csm_id === contatoFilterCSM; })
-                .map((c: ContatoComCliente) => {
-                  const client = allClients.find(cl => cl.id === c.client_id);
-                  const cl = Array.isArray(c.clients) ? c.clients[0] : c.clients;
-                  const csm = users.find(u => u.id === cl?.csm_id);
-                  return (
-                    <li key={c.id} onClick={() => { setActiveModal(null); router.push(`/clients/${c.client_id}`); }} className="px-6 py-3 hover:bg-slate-100 cursor-pointer transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">{client?.marca ?? "—"}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {csm?.full_name ?? "—"} · {new Date(c.date).toLocaleDateString("pt-BR")}
-                          </p>
-                        </div>
-                        <span className="text-xs text-gray-400">→</span>
-                      </div>
-                    </li>
-                  );
-                })}
+              {listaRealizados.length === 0 ? (
+                <li className="px-6 py-8 text-center text-sm text-gray-400">Nenhum contato realizado no período.</li>
+              ) : listaRealizados.map((c) => (
+                <li key={c.id} onClick={() => { setActiveModal(null); router.push(`/clients/${c.clientId}?contato=${c.id}`); }} className="px-6 py-3 hover:bg-slate-100 cursor-pointer transition-colors flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">{c.cliente}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{c.csm}</p>
+                  </div>
+                  <span className="text-xs text-gray-400 shrink-0">→</span>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
