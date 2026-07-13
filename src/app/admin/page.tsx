@@ -9,6 +9,7 @@ import AdminAnalytics from "@/components/AdminAnalytics";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
 import RankingCsm from "@/components/RankingCsm";
 import SaudeCarteira from "@/components/SaudeCarteira";
+import BuscaClientes from "@/components/BuscaClientes";
 
 type User = {
   id: string;
@@ -154,11 +155,14 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {/* Health Score */}
-            <SaudeCarteira />
+            {/* Busca de cliente */}
+            <BuscaClientes />
 
             {/* Distribuição da carteira (cluster + operação lado a lado) */}
             <DistribuicaoCarteira />
+
+            {/* Health Score */}
+            <SaudeCarteira />
           </div>
         )}
 
