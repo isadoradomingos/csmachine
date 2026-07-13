@@ -8,33 +8,31 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
 
-export type Preset = "hoje" | "semana_passada" | "mes_passado" | "ultimos_7" | "ultimos_30" | "personalizado";
+export type Preset = "este_mes" | "esta_semana" | "hoje" | "personalizado";
 export type CsmOpt = { id: string; nome: string };
 
 type SeriePonto = { label: string; total: number; [tipo: string]: number | string };
 export type DetalheContato = { id: string; clientId: string; cliente: string; csm: string; tipo: string };
 
 export const PRESETS: { id: Preset; label: string }[] = [
+  { id: "este_mes", label: "Este mês" },
+  { id: "esta_semana", label: "Esta semana" },
   { id: "hoje", label: "Hoje" },
-  { id: "semana_passada", label: "Semana passada" },
-  { id: "mes_passado", label: "Mês passado" },
-  { id: "ultimos_7", label: "Últimos 7 dias" },
-  { id: "ultimos_30", label: "Últimos 30 dias" },
   { id: "personalizado", label: "Personalizado" },
 ];
 
-const TIPOS_CONHECIDOS: Record<string, { nome: string; cor: string }> = {
+export const TIPOS_CONHECIDOS: Record<string, { nome: string; cor: string }> = {
   consultoria_produto: { nome: "Consultoria", cor: "#2563eb" },
   efetivo: { nome: "Efetivo", cor: "#16a34a" },
   tentativa: { nome: "Tentativa", cor: "#64748b" },
 };
-const COR_TOTAL = "#f59e0b";
-const PALETA_AUTO = ["#a855f7", "#ec4899", "#14b8a6", "#f97316", "#0ea5e9", "#84cc16", "#eab308"];
+export const COR_TOTAL = "#f59e0b";
+export const PALETA_AUTO = ["#a855f7", "#ec4899", "#14b8a6", "#f97316", "#0ea5e9", "#84cc16", "#eab308"];
 
-function nomeTipo(tipo: string): string {
+export function nomeTipo(tipo: string): string {
   return TIPOS_CONHECIDOS[tipo]?.nome ?? tipo.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
 }
-function corTipo(tipo: string, i: number): string {
+export function corTipo(tipo: string, i: number): string {
   return TIPOS_CONHECIDOS[tipo]?.cor ?? PALETA_AUTO[i % PALETA_AUTO.length];
 }
 
@@ -49,18 +47,12 @@ export function intervaloDoPreset(preset: Preset, custom: { de: string; ate: str
   const fim = new Date(hoje);
   if (preset === "hoje") {
     // início e fim já são hoje
-  } else if (preset === "ultimos_7") {
-    inicio.setDate(hoje.getDate() - 6);
-  } else if (preset === "ultimos_30") {
-    inicio.setDate(hoje.getDate() - 29);
-  } else if (preset === "semana_passada") {
-    const diaSemana = (hoje.getDay() + 6) % 7;
-    inicio.setDate(hoje.getDate() - diaSemana - 7);
-    fim.setTime(inicio.getTime());
-    fim.setDate(fim.getDate() + 6);
-  } else if (preset === "mes_passado") {
-    inicio.setDate(1); inicio.setMonth(inicio.getMonth() - 1);
-    fim.setDate(0);
+  } else if (preset === "este_mes") {
+    inicio.setDate(1); // primeiro dia do mês atual até hoje
+  } else if (preset === "esta_semana") {
+    // segunda-feira da semana atual até hoje
+    const diaSemana = (hoje.getDay() + 6) % 7; // 0 = segunda
+    inicio.setDate(hoje.getDate() - diaSemana);
   } else {
     if (custom.de) inicio.setTime(new Date(custom.de + "T00:00:00").getTime());
     if (custom.ate) fim.setTime(new Date(custom.ate + "T00:00:00").getTime());
@@ -159,16 +151,14 @@ export function SeletorCsm({
 // ============================================================
 // Gráfico principal (recebe filtros por props)
 // ============================================================
-export default function AdminAnalytics({
-  preset, custom, csmFiltro, onOpcoesCsm, onTotalRealizados,
-}: {
-  preset: Preset;
-  custom: { de: string; ate: string };
-  csmFiltro: string;
-  onOpcoesCsm?: (opcoes: CsmOpt[]) => void;
-  onTotalRealizados?: (total: number, lista: DetalheContato[]) => void;
-}) {
+// Gráfico principal (gerencia seu próprio período e filtro de CSM)
+// ============================================================
+export default function AdminAnalytics() {
   const router = useRouter();
+  const [preset, setPreset] = useState<Preset>("este_mes");
+  const [custom, setCustom] = useState({ de: "", ate: "" });
+  const [csmFiltro, setCsmFiltro] = useState("");
+  const [csmOpcoes, setCsmOpcoes] = useState<CsmOpt[]>([]);
   const [serie, setSerie] = useState<SeriePonto[]>([]);
   const [tiposPresentes, setTiposPresentes] = useState<string[]>([]);
   const [tiposOcultos, setTiposOcultos] = useState<Set<string>>(new Set());
@@ -218,7 +208,6 @@ export default function AdminAnalytics({
     const tiposSet = new Set<string>();
     const cruPorBucket: Record<string, { id: string; clientId: string; cliente: string; csmId: string | null; tipo: string }[]> = {};
     const csmSet: Record<string, boolean> = {};
-    let realizados = 0;
 
     for (const r of rows) {
       const cl = Array.isArray(r.clients) ? r.clients[0] : r.clients;
@@ -234,7 +223,6 @@ export default function AdminAnalytics({
         ponto.total = (ponto.total as number) + 1;
         ponto[r.type] = ((ponto[r.type] as number) ?? 0) + 1;
         tiposSet.add(r.type);
-        if (r.type !== "tentativa") realizados += 1;
         if (!cruPorBucket[k]) cruPorBucket[k] = [];
         cruPorBucket[k].push({ id: r.id, clientId: r.client_id, cliente: cl?.marca ?? "—", csmId, tipo: r.type });
       }
@@ -260,29 +248,21 @@ export default function AdminAnalytics({
     }
 
     const detalhes: Record<string, DetalheContato[]> = {};
-    const listaRealizados: DetalheContato[] = [];
     Object.entries(cruPorBucket).forEach(([k, lista]) => {
       detalhes[k] = lista.map(d => ({ id: d.id, clientId: d.clientId, cliente: d.cliente, csm: d.csmId ? (nomePorId[d.csmId] ?? "—") : "—", tipo: d.tipo }));
-      lista.forEach(d => {
-        if (d.tipo !== "tentativa") {
-          listaRealizados.push({ id: d.id, clientId: d.clientId, cliente: d.cliente, csm: d.csmId ? (nomePorId[d.csmId] ?? "—") : "—", tipo: d.tipo });
-        }
-      });
     });
 
     // Informa o page das opções de CSM (só quando em "Todos", para não perder opções ao filtrar)
-    if (onOpcoesCsm && !csmFiltro) {
+    if (!csmFiltro) {
       const opcoes: CsmOpt[] = idsCsm.map(id => ({ id, nome: nomePorId[id] ?? "—" })).sort((a, b) => a.nome.localeCompare(b.nome));
-      onOpcoesCsm(opcoes);
+      setCsmOpcoes(opcoes);
     }
-
-    if (onTotalRealizados) onTotalRealizados(realizados, listaRealizados);
 
     setSerie(serieArr);
     setTiposPresentes(tiposOrdenados);
     setDetalhesPorBucket(detalhes);
     setCarregando(false);
-  }, [preset, custom, csmFiltro, onOpcoesCsm, onTotalRealizados]);
+  }, [preset, custom, csmFiltro]);
 
   useEffect(() => {
     // carregar() é async; setState ocorre após await, não é síncrono.
@@ -297,9 +277,15 @@ export default function AdminAnalytics({
   return (
     <div className="space-y-4 mb-8">
       <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
-        <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700">Contatos ao longo do tempo</p>
-          <p className="text-xs text-gray-400">Evolução do volume de atendimentos no período selecionado</p>
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Contatos registrados ao longo do tempo</p>
+            <p className="text-xs text-gray-400">Evolução do volume de registros de atendimentos no período selecionado</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <SeletorPeriodo preset={preset} setPreset={setPreset} custom={custom} setCustom={setCustom} />
+            <SeletorCsm csmFiltro={csmFiltro} setCsmFiltro={setCsmFiltro} opcoes={csmOpcoes} />
+          </div>
         </div>
 
         {!carregando && (
