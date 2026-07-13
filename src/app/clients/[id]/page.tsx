@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import type { Client } from "@/lib/types";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { Info } from "lucide-react";
 
 type Contact = {
   id: string;
@@ -13,20 +12,6 @@ type Contact = {
   type: "tentativa" | "efetivo" | "consultoria_produto";
   note: string;
   canal: string;
-};
-
-type Feature = {
-  id: string;
-  nome: string;
-  categoria: string | null;
-  ordem: number;
-  operacao: string | null;
-  link: string | null;
-};
-
-type ClientDiagnostico = {
-  feature_id: string;
-  ativo: boolean;
 };
 
 type AuditLog = {
@@ -216,12 +201,6 @@ export default function ClientPage() {
   const [csm, setCsm] = useState<{ full_name: string } | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [audit, setAudit] = useState<AuditLog[]>([]);
-  const [features, setFeatures] = useState<Feature[]>([]);
-  const [diagnostico, setDiagnostico] = useState<Record<string, boolean>>({});
-  const [percepcoes, setPercepcoes] = useState("");
-  const [savingPercepcoes, setSavingPercepcoes] = useState(false);
-  const [editingPercepcoes, setEditingPercepcoes] = useState(false);
-  const [savedPercepcoes, setSavedPercepcoes] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [savingObservacoes, setSavingObservacoes] = useState(false);
   const [editingObservacoes, setEditingObservacoes] = useState(false);
@@ -230,8 +209,9 @@ export default function ClientPage() {
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [activeTab, setActiveTab] = useState<"contatos" | "diagnostico" | "historico">("contatos");
-  const [openInfoId, setOpenInfoId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"contatos" | "health" | "historico">("contatos");
+  const [healthScore, setHealthScore] = useState<{ score: number | null; banda: string; sub_volume: number | null; sub_queda: number | null; sub_perdidas: number | null; operacao: string; rede: string; parcial: boolean } | null>(null);
+  const [healthCarregando, setHealthCarregando] = useState(true);
   const [auditLimit, setAuditLimit] = useState(10);
   const [form, setForm] = useState({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" });
   const [showTentativaModal, setShowTentativaModal] = useState(false);
@@ -267,24 +247,6 @@ export default function ClientPage() {
     }
   }
 
-  async function loadDiagnostico() {
-    const { data: featuresData } = await supabase
-      .from("features")
-      .select("*")
-      .eq("ativo", true)
-      .order("ordem");
-    setFeatures(featuresData ?? []);
-
-    const { data: diagData } = await supabase
-      .from("client_diagnostico")
-      .select("feature_id, ativo")
-      .eq("client_id", id);
-
-    const map: Record<string, boolean> = {};
-    (diagData ?? []).forEach((d: ClientDiagnostico) => { map[d.feature_id] = d.ativo; });
-    setDiagnostico(map);
-  }
-
   async function logAudit(action: string, entity: string, field?: string, oldValue?: string, newValue?: string) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -299,40 +261,31 @@ export default function ClientPage() {
     });
   }
 
-  async function handleToggleFeature(featureId: string, currentValue: boolean) {
-    const newValue = !currentValue;
-    setDiagnostico(prev => ({ ...prev, [featureId]: newValue }));
-
-    await supabase.from("client_diagnostico").upsert({
-      client_id: id,
-      feature_id: featureId,
-      ativo: newValue,
-    }, { onConflict: "client_id,feature_id" });
-
-    const feature = features.find(f => f.id === featureId);
-    await logAudit(
-      newValue ? "ativou funcionalidade" : "desativou funcionalidade",
-      "Diagnóstico",
-      feature?.nome ?? "Funcionalidade",
-      currentValue ? "Ativo" : "Inativo",
-      newValue ? "Ativo" : "Inativo"
-    );
-    await loadAudit();
+  // Normaliza nome para casamento aproximado (ignora acento, maiúscula, espaço e pontuação)
+  function normalizar(s: string): string {
+    return (s ?? "")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, ""); // remove espaços, hífens, pontuação
   }
 
-  async function handleSavePercepcoes() {
-    setSavingPercepcoes(true);
-    const { data: clientData } = await supabase
-      .from("clients")
-      .select("percepcoes_gerais")
-      .eq("id", id)
-      .single();
-    await supabase.from("clients").update({ percepcoes_gerais: percepcoes }).eq("id", id);
-    await logAudit("editou", "Diagnóstico", "Percepções gerais", clientData?.percepcoes_gerais ?? "(vazio)", percepcoes);
-    await loadAudit();
-    setSavedPercepcoes(percepcoes);
-    setEditingPercepcoes(false);
-    setSavingPercepcoes(false);
+  async function carregarHealthScore(marca: string) {
+    setHealthCarregando(true);
+    const alvo = normalizar(marca);
+    if (!alvo) { setHealthScore(null); setHealthCarregando(false); return; }
+
+    const { data, error } = await supabase
+      .from("hs_scores")
+      .select("rede, operacao, score, banda, sub_volume, sub_queda, sub_perdidas, parcial")
+      .eq("tipo", "rede");
+
+    if (error || !data || data.length === 0) { setHealthScore(null); setHealthCarregando(false); return; }
+
+    type RedeScore = { rede: string; operacao: string; score: number | null; banda: string; sub_volume: number | null; sub_queda: number | null; sub_perdidas: number | null; parcial: boolean };
+    // casa por nome normalizado
+    const match = (data as RedeScore[]).find(r => normalizar(r.rede) === alvo);
+    setHealthScore(match ?? null);
+    setHealthCarregando(false);
   }
 
   useEffect(() => {
@@ -348,10 +301,11 @@ export default function ClientPage() {
 
       if (!client) { router.push("/dashboard"); return; }
       setClient(client);
-      setPercepcoes(client.percepcoes_gerais ?? "");
-      setSavedPercepcoes(client.percepcoes_gerais ?? "");
       setObservacoes(client.observacoes ?? "");
       setSavedObservacoes(client.observacoes ?? "");
+
+      // Health Score: casa a marca do cliente com a rede (nome normalizado, aproximado)
+      void carregarHealthScore(client.marca);
 
       if (client.csm_id) {
         const { data: profile } = await supabase
@@ -364,7 +318,6 @@ export default function ClientPage() {
 
       await loadContacts();
       await loadAudit();
-      await loadDiagnostico();
       setLoading(false);
     }
     load();
@@ -554,13 +507,6 @@ export default function ClientPage() {
 
   if (!client) return null;
 
-  const visibleFeatures = features.filter(
-    f => !f.operacao || f.operacao === "ambos" || f.operacao === client.operacao
-  );
-  const semCategoria = visibleFeatures.filter(f => !f.categoria);
-  const categorias = [...new Set(visibleFeatures.filter(f => f.categoria).map(f => f.categoria))];
-  const ativas = visibleFeatures.filter(f => diagnostico[f.id]).length;
-
   return (
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
@@ -643,8 +589,8 @@ export default function ClientPage() {
             <button onClick={() => setActiveTab("contatos")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "contatos" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
               Registro de Contatos
             </button>
-            <button onClick={() => setActiveTab("diagnostico")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "diagnostico" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
-              Diagnóstico
+            <button onClick={() => setActiveTab("health")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "health" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
+              Health Score
             </button>
             <button onClick={() => setActiveTab("historico")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "historico" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
               Histórico de Registros
@@ -712,148 +658,87 @@ export default function ClientPage() {
               </>
             )}
 
-            {/* Diagnóstico */}
-            {activeTab === "diagnostico" && (
+            {/* Health Score */}
+            {activeTab === "health" && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <p className="text-sm text-gray-500">{ativas} de {visibleFeatures.length} funcionalidades ativas</p>
-                  {audit.filter(a => a.entity === "Diagnóstico").length > 0 && (
-                    <p className="text-xs text-gray-400">
-                      Última alteração de diagnóstico em: {new Date(audit.filter(a => a.entity === "Diagnóstico")[0].created_at).toLocaleDateString("pt-BR")}
+                {healthCarregando ? (
+                  <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+                ) : !healthScore ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center">
+                    <p className="text-sm font-medium text-gray-500">Sem health score para este cliente</p>
+                    <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
+                      Não encontramos uma rede correspondente a <span className="font-medium">{client.marca}</span> nos
+                      dados do Health Score. Isso pode acontecer se o nome não casou com os dados importados ou se ainda
+                      não há dados para esta central.
                     </p>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <>
+                    {(() => {
+                      const banda = healthScore.banda;
+                      const cor = banda === "Verde" ? "#16a34a" : banda === "Amarelo" ? "#f59e0b" : banda === "Vermelho" ? "#dc2626" : "#94a3b8";
+                      const fundo = banda === "Verde" ? "#f0fdf4" : banda === "Amarelo" ? "#fffbeb" : banda === "Vermelho" ? "#fef2f2" : "#f8fafc";
+                      const rotuloBanda = banda === "Verde" ? "Saudável" : banda === "Amarelo" ? "Em risco" : banda === "Vermelho" ? "Crítico" : "Não avaliado";
+                      return (
+                        <div className="rounded-2xl border p-6" style={{ borderColor: cor + "55", background: fundo }}>
+                          <div className="flex items-center justify-between flex-wrap gap-4">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Health Score da rede</p>
+                              <p className="text-sm text-gray-500 mt-0.5">{healthScore.rede} · {healthScore.operacao}</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="text-4xl font-bold" style={{ color: cor }}>
+                                  {healthScore.score !== null ? Math.round(healthScore.score) : "—"}
+                                </p>
+                                <p className="text-xs text-gray-400">de 100</p>
+                              </div>
+                              <span className="px-3 py-1.5 rounded-full text-sm font-semibold text-white" style={{ background: cor }}>
+                                {rotuloBanda}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
-                <div className="rounded-xl border border-slate-200/70 bg-white p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Percepções gerais</p>
-                    {!editingPercepcoes ? (
-                      <button
-                        onClick={() => setEditingPercepcoes(true)}
-                        className="text-xs text-blue-500 hover:text-blue-700"
-                      >
-                        {percepcoes ? "Editar" : "Adicionar"}
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => { setEditingPercepcoes(false); setPercepcoes(savedPercepcoes); }}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          onClick={handleSavePercepcoes}
-                          disabled={savingPercepcoes}
-                          className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                        >
-                          {savingPercepcoes ? "Salvando..." : "Salvar"}
-                        </button>
+                    {/* Sub-notas do bloco Uso */}
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Fatores avaliados (bloco Uso)</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {([
+                          { rotulo: "Volume relativo", valor: healthScore.sub_volume, ajuda: "Volume de operação frente à mediana do plano" },
+                          { rotulo: "Perfil de queda", valor: healthScore.sub_queda, ajuda: "Velocidade de queda nos últimos meses" },
+                          { rotulo: "Taxa de perdidas", valor: healthScore.sub_perdidas, ajuda: "Proporção de solicitações canceladas" },
+                        ] as const).map(sub => {
+                          const v = sub.valor;
+                          const corSub = v === null ? "#94a3b8" : v >= 100 ? "#16a34a" : v >= 50 ? "#f59e0b" : "#dc2626";
+                          const rotuloSub = v === null ? "N/A" : v >= 100 ? "Bom" : v >= 50 ? "Atenção" : "Crítico";
+                          return (
+                            <div key={sub.rotulo} className="rounded-xl border border-slate-200/70 bg-white p-4">
+                              <p className="text-sm font-medium text-gray-700">{sub.rotulo}</p>
+                              <p className="text-xs text-gray-400 mt-0.5 mb-2">{sub.ajuda}</p>
+                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ background: corSub }}>
+                                {rotuloSub}{v !== null ? ` · ${v}` : ""}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {healthScore.parcial && (
+                      <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
+                        <p className="text-xs text-amber-900">
+                          <span className="font-semibold">Score parcial.</span> Esta nota considera apenas o bloco de Uso
+                          &amp; engajamento (Volume, Queda e Taxa de perdidas). Os demais critérios do modelo
+                          (Equilíbrio, Financeiro, Funcionalidades, NPS, Suporte e Filiais) serão incorporados conforme
+                          os dados forem importados.
+                        </p>
                       </div>
                     )}
-                  </div>
-                  {editingPercepcoes ? (
-                    <textarea
-                      value={percepcoes}
-                      onChange={(e) => setPercepcoes(e.target.value)}
-                      placeholder="Registre percepções sobre o uso da plataforma, pontos de atenção, oportunidades..."
-                      rows={4}
-                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      autoFocus
-                    />
-                  ) : (
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                      {percepcoes || <span className="text-gray-400">Nenhuma percepção registrada.</span>}
-                    </p>
-                  )}
-                </div>
-
-                {semCategoria.length > 0 && (
-                  <ul className="space-y-1">
-                    {semCategoria.map(f => (
-                      <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-slate-200/60 last:border-0">
-                        <span className="flex items-center gap-1.5 text-sm text-gray-700">
-                          {f.nome}
-                          {f.link && (
-                            <span className="relative inline-flex">
-                              <button
-                                onClick={() => setOpenInfoId(openInfoId === f.id ? null : f.id)}
-                                className="text-gray-400 hover:text-blue-500 transition-colors"
-                                title="Mais informações"
-                              >
-                                <Info size={14} />
-                              </button>
-                              {openInfoId === f.id && (
-                                <span className="absolute left-0 top-6 z-10 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
-                                  <a
-                                    href={f.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    onClick={() => setOpenInfoId(null)}
-                                    className="text-xs text-blue-600 hover:underline"
-                                  >
-                                    Ver artigo de suporte ↗
-                                  </a>
-                                </span>
-                              )}
-                            </span>
-                          )}
-                        </span>
-                        <button
-                          onClick={() => handleToggleFeature(f.id, diagnostico[f.id] ?? false)}
-                          className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${diagnostico[f.id] ? "bg-blue-500" : "bg-gray-200"}`}
-                        >
-                          <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${diagnostico[f.id] ? "translate-x-5" : "translate-x-0"}`} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  </>
                 )}
-
-                {categorias.map(cat => (
-                  <div key={cat as string}>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">{cat}</p>
-                    <ul className="space-y-1">
-                      {visibleFeatures.filter(f => f.categoria === cat).map(f => (
-                        <li key={f.id} className="flex items-center justify-between py-2.5 border-b border-slate-200/60 last:border-0">
-                          <span className="flex items-center gap-1.5 text-sm text-gray-700">
-                            {f.nome}
-                            {f.link && (
-                              <span className="relative inline-flex">
-                                <button
-                                  onClick={() => setOpenInfoId(openInfoId === f.id ? null : f.id)}
-                                  className="text-gray-400 hover:text-blue-500 transition-colors"
-                                  title="Mais informações"
-                                >
-                                  <Info size={14} />
-                                </button>
-                                {openInfoId === f.id && (
-                                  <span className="absolute left-0 top-6 z-10 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 whitespace-nowrap">
-                                    <a
-                                      href={f.link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={() => setOpenInfoId(null)}
-                                      className="text-xs text-blue-600 hover:underline"
-                                    >
-                                      Ver artigo de suporte ↗
-                                    </a>
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </span>
-                          <button
-                            onClick={() => handleToggleFeature(f.id, diagnostico[f.id] ?? false)}
-                            className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${diagnostico[f.id] ? "bg-blue-500" : "bg-gray-200"}`}
-                          >
-                            <span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${diagnostico[f.id] ? "translate-x-5" : "translate-x-0"}`} />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
               </div>
             )}
 
