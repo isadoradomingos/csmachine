@@ -274,16 +274,38 @@ export default function ClientPage() {
     const alvo = normalizar(marca);
     if (!alvo) { setHealthScore(null); setHealthCarregando(false); return; }
 
-    const { data, error } = await supabase
+    type RedeScore = { rede: string; operacao: string; score: number | null; banda: string; sub_volume: number | null; sub_queda: number | null; sub_perdidas: number | null; parcial: boolean };
+
+    // 1) Tenta casamento exato no banco (cobre a maioria, ex: "Up City Brasil")
+    const { data: exato } = await supabase
       .from("hs_scores")
       .select("rede, operacao, score, banda, sub_volume, sub_queda, sub_perdidas, parcial")
-      .eq("tipo", "rede");
+      .eq("tipo", "rede")
+      .eq("rede", marca)
+      .limit(1);
 
-    if (error || !data || data.length === 0) { setHealthScore(null); setHealthCarregando(false); return; }
+    if (exato && exato.length > 0) {
+      setHealthScore(exato[0] as RedeScore);
+      setHealthCarregando(false);
+      return;
+    }
 
-    type RedeScore = { rede: string; operacao: string; score: number | null; banda: string; sub_volume: number | null; sub_queda: number | null; sub_perdidas: number | null; parcial: boolean };
-    // casa por nome normalizado
-    const match = (data as RedeScore[]).find(r => normalizar(r.rede) === alvo);
+    // 2) Fallback: busca ampla COM paginação (cobre divergências de acento/espaço/caixa)
+    const todas: RedeScore[] = [];
+    let from = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from("hs_scores")
+        .select("rede, operacao, score, banda, sub_volume, sub_queda, sub_perdidas, parcial")
+        .eq("tipo", "rede")
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      todas.push(...(data as RedeScore[]));
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+
+    const match = todas.find(r => normalizar(r.rede) === alvo);
     setHealthScore(match ?? null);
     setHealthCarregando(false);
   }

@@ -53,6 +53,7 @@ export default function SaudeCarteira() {
   const [semDados, setSemDados] = useState(false);
   const [filtroBanda, setFiltroBanda] = useState<BandaKey | null>(null);
   const [busca, setBusca] = useState("");
+  const [clientesPorNome, setClientesPorNome] = useState<Record<string, string>>({});
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -76,6 +77,24 @@ export default function SaudeCarteira() {
     }
 
     if (linhas.length === 0) { setSemDados(true); setCarregando(false); return; }
+
+    // Carrega clientes para casar rede -> cliente por nome (client_id não é preenchido no hs_scores)
+    const mapaClientes: Record<string, string> = {};
+    let cf = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, marca")
+        .range(cf, cf + 999);
+      if (error || !data || data.length === 0) break;
+      for (const c of data as { id: string; marca: string }[]) {
+        const chave = norm(c.marca);
+        if (chave && !mapaClientes[chave]) mapaClientes[chave] = c.id;
+      }
+      if (data.length < 1000) break;
+      cf += 1000;
+    }
+    setClientesPorNome(mapaClientes);
 
     const cont: Record<string, number> = { Verde: 0, Amarelo: 0, Vermelho: 0, "N/A": 0 };
     linhas.forEach(r => { if (r.banda in cont) cont[r.banda]++; });
@@ -201,11 +220,12 @@ export default function SaudeCarteira() {
                 <li className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma rede encontrada.</li>
               ) : redesFiltradas.map((r, i) => {
                 const cor = CORES[r.banda];
-                const clicavel = !!r.client_id;
+                const clientId = r.client_id ?? clientesPorNome[norm(r.rede)] ?? null;
+                const clicavel = !!clientId;
                 return (
                   <li key={`${r.rede}-${r.operacao}-${i}`}>
                     <button
-                      onClick={() => { if (r.client_id) router.push(`/clients/${r.client_id}`); }}
+                      onClick={() => { if (clientId) router.push(`/clients/${clientId}`); }}
                       disabled={!clicavel}
                       className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-colors ${clicavel ? "hover:bg-slate-100 cursor-pointer" : "cursor-default"}`}
                     >
