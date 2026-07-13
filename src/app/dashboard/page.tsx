@@ -5,6 +5,9 @@ import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import type { Profile, Client } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import SaudeCarteira from "@/components/SaudeCarteira";
+import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
+import { FilaPriorizacao } from "@/components/FilaPriorizacao";
 
 type ConsultoriaCliente = { id: string; marca: string; bandeira: string | null; csm_id: string | null };
 type ConsultoriaMes = { client_id: string; date: string; clients: ConsultoriaCliente | ConsultoriaCliente[] | null };
@@ -25,6 +28,8 @@ export default function DashboardPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [abaAtiva, setAbaAtiva] = useState<"carteira" | "estatisticas">("carteira");
+  const [criticosCount, setCriticosCount] = useState<number | null>(null);
   const [filterOperacao, setFilterOperacao] = useState("");
   const [filterCluster, setFilterCluster] = useState("");
   const [sortOrder, setSortOrder] = useState<"" | "recente" | "antigo">("");
@@ -34,7 +39,7 @@ export default function DashboardPage() {
   const [semHistoricoSet, setSemHistoricoSet] = useState<Set<string>>(new Set());
   const [semRetornoClients, setSemRetornoClients] = useState<ModalClient[]>([]);
   const [consultoriasMes, setConsultoriasMes] = useState<ConsultoriaMes[]>([]);
-  const [modal, setModal] = useState<{ type: "followup" | "semretorno" | "consultorias" } | null>(null);
+  const [modal, setModal] = useState<{ type: "followup" | "semretorno" | "consultorias" | "fila" } | null>(null);
 
   // Estados do modal de follow-up
   const [modalSearch, setModalSearch] = useState("");
@@ -228,6 +233,26 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">
+        {/* Abas */}
+        <div className="flex gap-1 mb-6 border-b border-slate-700">
+          {([
+            { id: "carteira", label: "Minha carteira" },
+            { id: "estatisticas", label: "Estatísticas gerais" },
+          ] as const).map(aba => (
+            <button
+              key={aba.id}
+              onClick={() => setAbaAtiva(aba.id)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                abaAtiva === aba.id ? "border-blue-500 text-white" : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              {aba.label}
+            </button>
+          ))}
+        </div>
+
+        {abaAtiva === "carteira" && (
+        <>
         {/* Painel de progresso */}
         {(() => {
           const goal = profile?.monthly_goal ?? 0;
@@ -271,19 +296,21 @@ export default function DashboardPage() {
 
         {/* Cards indicadores */}
         <div className="grid sm:grid-cols-2 gap-4 mb-6">
-          <button onClick={() => { setModalSearch(""); setModalOrder("desc"); setModalFilterType("mais"); setModalFilterDays(""); setModalFilterDays2(""); setModal({ type: "followup" }); }} className="text-left bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer transition-all hover:shadow-md hover:border-amber-300 group">
+          <button onClick={() => setModal({ type: "fila" })} className="text-left bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer transition-all hover:shadow-md hover:border-blue-300 group">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium text-gray-600">Oportunidades de follow-up</p>
-              <span className="h-7 w-7 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+              <p className="text-sm font-medium text-gray-600">Fila de priorização de contato</p>
+              <span className="h-7 w-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h6" />
                 </svg>
               </span>
             </div>
-            <p className="text-3xl font-semibold text-gray-900 tabular-nums">{followUpClients.length}</p>
+            <p className="text-3xl font-semibold text-gray-900 tabular-nums">{criticosCount ?? "—"}</p>
             <div className="flex items-center justify-between mt-1 gap-2">
-              <p className="text-xs text-gray-400">clientes sem contato há mais de 20 dias</p>
-              <span className="text-xs font-medium text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">ver lista →</span>
+              <p className="text-xs text-gray-400">
+                {criticosCount === 1 ? "cliente em estado crítico" : "clientes em estado crítico"} · priorizados por Health Score + percepção
+              </p>
+              <span className="text-xs font-medium text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">ver fila →</span>
             </div>
           </button>
 
@@ -392,6 +419,20 @@ export default function DashboardPage() {
             </ul>
           )}
         </div>
+        </>
+        )}
+
+        {abaAtiva === "estatisticas" && (
+          <div className="space-y-6">
+            <DistribuicaoCarteira />
+            <SaudeCarteira />
+          </div>
+        )}
+
+        {/* Fila oculta: monta sempre para calcular o nº de críticos do card (sem exibir) */}
+        <div className="hidden" aria-hidden="true">
+          <FilaPriorizacao clientes={clients} onAbrirCliente={() => {}} onContarCriticos={setCriticosCount} />
+        </div>
       </main>
 
       {/* Modal follow-up */}
@@ -477,6 +518,23 @@ export default function DashboardPage() {
         </div>
       )}
       {/* Modal Consultorias do mês */}
+      {modal?.type === "fila" && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setModal(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-gray-900">Fila de priorização de contato</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Ordenada por Health Score e sua percepção · os mais urgentes primeiro</p>
+              </div>
+              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto">
+              <FilaPriorizacao clientes={clients} onAbrirCliente={(cid) => { setModal(null); router.push(`/clients/${cid}`); }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {modal?.type === "consultorias" && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import type { Client } from "@/lib/types";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { SeletorPercepcao, EtiquetaPercepcao, type Percepcao } from "@/components/Percepcao";
 
 type Contact = {
   id: string;
@@ -12,6 +13,7 @@ type Contact = {
   type: "tentativa" | "efetivo" | "consultoria_produto";
   note: string;
   canal: string;
+  percepcao?: string | null;
 };
 
 type AuditLog = {
@@ -213,9 +215,9 @@ export default function ClientPage() {
   const [healthScore, setHealthScore] = useState<{ score: number | null; banda: string; sub_volume: number | null; sub_queda: number | null; sub_perdidas: number | null; operacao: string; rede: string; parcial: boolean } | null>(null);
   const [healthCarregando, setHealthCarregando] = useState(true);
   const [auditLimit, setAuditLimit] = useState(10);
-  const [form, setForm] = useState({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" });
+  const [form, setForm] = useState<{ type: string; date: string; note: string; canal: string; percepcao: Percepcao }>({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null });
   const [showTentativaModal, setShowTentativaModal] = useState(false);
-  const [tentativaForm, setTentativaForm] = useState({ date: new Date().toISOString().split("T")[0], canal: "whatsapp", note: "" });
+  const [tentativaForm, setTentativaForm] = useState<{ date: string; canal: string; note: string; percepcao: Percepcao }>({ date: new Date().toISOString().split("T")[0], canal: "whatsapp", note: "", percepcao: null });
   const [savingTentativa, setSavingTentativa] = useState(false);
 
   async function loadContacts() {
@@ -371,11 +373,12 @@ export default function ClientPage() {
       type: "tentativa",
       note: tentativaForm.note || "Tentativa de contato",
       canal: tentativaForm.canal,
+      percepcao: tentativaForm.percepcao,
     });
     await logAudit("registrou", "Contato", "Tipo", undefined, "Tentativa de contato");
     await loadContacts();
     await loadAudit();
-    setTentativaForm({ date: new Date().toISOString().split("T")[0], canal: "whatsapp", note: "" });
+    setTentativaForm({ date: new Date().toISOString().split("T")[0], canal: "whatsapp", note: "", percepcao: null });
     setShowTentativaModal(false);
     setSavingTentativa(false);
   }
@@ -421,6 +424,7 @@ export default function ClientPage() {
         date: form.date,
         note: form.note,
         canal: form.canal,
+        percepcao: form.percepcao,
       }).eq("id", editingContact.id);
     } else {
       await supabase.from("client_contacts").insert({
@@ -429,6 +433,7 @@ export default function ClientPage() {
         type: form.type,
         note: form.note,
         canal: form.canal,
+        percepcao: form.percepcao,
       });
 
       const typeLabels: Record<string, string> = {
@@ -452,7 +457,7 @@ export default function ClientPage() {
 
     await loadContacts();
     await loadAudit();
-    setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" });
+    setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null });
     setEditingContact(null);
     setShowModal(false);
     setSaving(false);
@@ -480,7 +485,7 @@ export default function ClientPage() {
 
   function openEdit(contact: Contact) {
     setEditingContact(contact);
-    setForm({ type: contact.type, date: contact.date, note: contact.note, canal: contact.canal ?? "whatsapp" });
+    setForm({ type: contact.type, date: contact.date, note: contact.note, canal: contact.canal ?? "whatsapp", percepcao: (contact.percepcao as Percepcao) ?? null });
     setShowModal(true);
   }
 
@@ -529,6 +534,9 @@ export default function ClientPage() {
 
   if (!client) return null;
 
+  // Percepção atual = a do contato mais recente que tenha percepção preenchida
+  const percepcaoAtual = contacts.find(c => c.percepcao) ?? null;
+
   return (
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
@@ -556,6 +564,9 @@ export default function ClientPage() {
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${planoColor[client.plano] ?? "bg-gray-100 text-gray-600"}`}>
                     {client.plano.charAt(0).toUpperCase() + client.plano.slice(1)}
                   </span>
+                )}
+                {percepcaoAtual && (
+                  <EtiquetaPercepcao value={percepcaoAtual.percepcao as Percepcao} data={percepcaoAtual.date} />
                 )}
               </div>
               <p className="text-sm text-gray-400 mt-1">Bandeira {client.bandeira}</p>
@@ -591,9 +602,16 @@ export default function ClientPage() {
               <dd className="text-sm font-medium text-gray-900">{client.operacao ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-xs text-gray-400 mb-1">Início do contrato</dt>
-              <dd className="text-sm font-medium text-gray-900">
-                {client.data_inicio ? new Date(client.data_inicio).toLocaleDateString("pt-BR") : "—"}
+              <dt className="text-xs text-gray-400 mb-1">Health Score</dt>
+              <dd className="text-sm font-medium">
+                {healthScore && healthScore.score !== null ? (
+                  <span style={{ color: healthScore.banda === "Verde" ? "#16a34a" : healthScore.banda === "Amarelo" ? "#f59e0b" : healthScore.banda === "Vermelho" ? "#dc2626" : "#64748b" }}>
+                    {Math.round(healthScore.score)}
+                    <span className="text-gray-400 font-normal"> · {healthScore.banda === "Verde" ? "Saudável" : healthScore.banda === "Amarelo" ? "Em risco" : healthScore.banda === "Vermelho" ? "Crítico" : healthScore.banda}</span>
+                  </span>
+                ) : (
+                  <span className="text-gray-900">—</span>
+                )}
               </dd>
             </div>
             <div>
@@ -634,7 +652,7 @@ export default function ClientPage() {
                       Registrar tentativa de contato
                     </button>
                     <button
-                      onClick={() => { setEditingContact(null); setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp" }); setShowModal(true); }}
+                      onClick={() => { setEditingContact(null); setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null }); setShowModal(true); }}
                       className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       + Registrar contato
@@ -665,6 +683,7 @@ export default function ClientPage() {
                                 {canalLabel[c.canal] ?? c.canal}
                               </span>
                             )}
+                            {c.percepcao && <EtiquetaPercepcao value={c.percepcao as Percepcao} />}
                           </div>
                           <div className="flex items-center gap-3 shrink-0">
                             <span className="text-xs text-gray-400">{new Date(c.date).toLocaleDateString("pt-BR")}</span>
@@ -875,6 +894,7 @@ export default function ClientPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Data</label>
                 <input type="date" value={tentativaForm.date} onChange={(e) => setTentativaForm({ ...tentativaForm, date: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+              <SeletorPercepcao value={tentativaForm.percepcao} onChange={(v) => setTentativaForm({ ...tentativaForm, percepcao: v })} />
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Observação (opcional)</label>
                 <textarea value={tentativaForm.note} onChange={(e) => setTentativaForm({ ...tentativaForm, note: e.target.value })} placeholder="Ex: Não atendeu, deixei recado..." rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
@@ -916,6 +936,7 @@ export default function ClientPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Data</label>
                 <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+              <SeletorPercepcao value={form.percepcao} onChange={(v) => setForm({ ...form, percepcao: v })} />
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Anotação</label>
                 <RichTextEditor
