@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { calcularHealthScore, type CentralRaw } from "@/lib/healthScore";
+import ImportarHealthScore from "@/components/ImportarHealthScore";
 
 type ResumoBanda = { Verde: number; Amarelo: number; Vermelho: number; "N/A": number };
 
@@ -26,15 +27,25 @@ export default function HealthScorePage() {
   // Carrega o resumo atual dos scores já calculados (se houver)
   const carregarResumo = useCallback(async () => {
     setCarregando(true);
-    const { data, error } = await supabase
-      .from("hs_scores")
-      .select("banda, calculado_em")
-      .eq("tipo", "rede");
-    if (error) { setCarregando(false); return; }
-    if (data && data.length > 0) {
+    // Pagina para pegar TODAS as redes (o Supabase retorna no máx 1000 por vez)
+    const linhas: { banda: string; calculado_em: string }[] = [];
+    let from = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from("hs_scores")
+        .select("banda, calculado_em")
+        .eq("tipo", "rede")
+        .range(from, from + 999);
+      if (error) { setCarregando(false); return; }
+      if (!data || data.length === 0) break;
+      linhas.push(...(data as { banda: string; calculado_em: string }[]));
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    if (linhas.length > 0) {
       const r: ResumoBanda = { Verde: 0, Amarelo: 0, Vermelho: 0, "N/A": 0 };
       let maisRecente = "";
-      for (const row of data as { banda: string; calculado_em: string }[]) {
+      for (const row of linhas) {
         if (row.banda in r) r[row.banda as keyof ResumoBanda]++;
         if (row.calculado_em > maisRecente) maisRecente = row.calculado_em;
       }
@@ -132,6 +143,9 @@ export default function HealthScorePage() {
         nome: s.rede,
         score: s.score,
         banda: s.banda,
+        sub_volume: s.sub_volume,
+        sub_queda: s.sub_queda,
+        sub_perdidas: s.sub_perdidas,
         n_centrais: s.n_centrais,
         volume_total: s.volume_total,
         parcial: true,
@@ -181,11 +195,18 @@ export default function HealthScorePage() {
           </p>
         </div>
 
-        {/* Ação de recalcular */}
+        {/* Passo 1 — Importar planilha */}
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+          <p className="text-sm font-semibold text-gray-700 mb-1">1. Importar planilha de dados</p>
+          <p className="text-xs text-gray-400 mb-4">Suba o CSV com os dados das centrais. Revise as redes e grave. Reimportar atualiza os meses presentes no arquivo.</p>
+          <ImportarHealthScore />
+        </div>
+
+        {/* Passo 2 — Ação de recalcular */}
         <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-sm font-medium text-gray-700">Cálculo do Health Score</p>
+              <p className="text-sm font-semibold text-gray-700">2. Recalcular Health Score</p>
               <p className="text-xs text-gray-400 mt-0.5">
                 {ultimoCalculo
                   ? `Último cálculo: ${new Date(ultimoCalculo).toLocaleString("pt-BR")}`

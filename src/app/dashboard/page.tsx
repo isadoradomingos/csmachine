@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import type { Profile, Client } from "@/lib/types";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import SaudeCarteira from "@/components/SaudeCarteira";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
 import { FilaPriorizacao } from "@/components/FilaPriorizacao";
@@ -22,8 +22,11 @@ type ModalClient = {
   tentativasSemRetorno?: number;
 };
 
-export default function DashboardPage() {
+function DashboardInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const csmParam = searchParams.get("csm");
+  const [viewingOther, setViewingOther] = useState(false);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,17 +60,29 @@ export default function DashboardPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push("/login"); return; }
 
+    // Determina de qual CSM mostrar a carteira:
+    // - por padrão, o próprio usuário logado
+    // - se veio ?csm=ID na URL E o usuário logado é admin, mostra a carteira daquele CSM
+    let targetId = user.id;
+    let ehOutro = false;
+    if (csmParam && csmParam !== user.id) {
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+      const ehAdmin = (roles ?? []).some((r: { role: string }) => r.role === "admin");
+      if (ehAdmin) { targetId = csmParam; ehOutro = true; }
+    }
+    setViewingOther(ehOutro);
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("*")
-      .eq("id", user.id)
+      .eq("id", targetId)
       .single();
     setProfile(profile);
 
     const { data: clients } = await supabase
       .from("clients")
       .select("id, marca, bandeira, operacao, plano, cluster, status, last_contact")
-      .eq("csm_id", user.id)
+      .eq("csm_id", targetId)
       .eq("status", "ativo")
       .order("marca")
       .limit(10000);
@@ -79,7 +94,7 @@ export default function DashboardPage() {
       .from("client_contacts")
       .select("client_id, date, clients!inner(id, marca, bandeira, csm_id)")
       .eq("type", "consultoria_produto")
-      .eq("clients.csm_id", user.id)
+      .eq("clients.csm_id", targetId)
       .gte("date", startOfMonth.toISOString().split("T")[0])
       .order("date", { ascending: false });
     setConsultoriasMes(consultoriasDoMes ?? []);
@@ -152,7 +167,7 @@ export default function DashboardPage() {
 
     setSemRetornoClients(semRetorno);
     setLoading(false);
-  }, [router]);
+  }, [router, csmParam]);
 
   useEffect(() => {
     // load() é async; os setState ocorrem após await, não são síncronos.
@@ -231,6 +246,20 @@ export default function DashboardPage() {
           <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-red-500 transition-colors">Sair</button>
         </div>
       </header>
+
+      {viewingOther && (
+        <div className="bg-blue-600 text-white px-6 py-2.5 flex items-center justify-between gap-3 flex-wrap">
+          <span className="text-sm">
+            Você está vendo a carteira de <span className="font-semibold">{profile?.full_name}</span> como administrador.
+          </span>
+          <button
+            onClick={() => router.push("/admin")}
+            className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition-colors font-medium"
+          >
+            ← Voltar ao Painel de Gestão
+          </button>
+        </div>
+      )}
 
       <main className="max-w-5xl mx-auto px-6 py-8">
         {/* Abas */}
@@ -569,5 +598,13 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-800 flex items-center justify-center"><p className="text-slate-400 text-sm">Carregando...</p></div>}>
+      <DashboardInner />
+    </Suspense>
   );
 }

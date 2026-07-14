@@ -1,203 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import Image from "next/image";
-import type { Profile, Client } from "@/lib/types";
+import { useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 
-export default function AdminCsmPage() {
+// A visão da carteira de um CSM foi unificada com o dashboard real.
+// Esta rota agora redireciona para /dashboard?csm=ID, evitando duplicação de tela.
+export default function CsmRedirect() {
   const router = useRouter();
-  const { id } = useParams();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingGoal, setEditingGoal] = useState(false);
-  const [now] = useState(() => Date.now());
-  const [newGoal, setNewGoal] = useState("");
-  const [savingGoal, setSavingGoal] = useState(false);
-  const [search, setSearch] = useState("");
+  const params = useParams();
+  const id = params.id as string;
 
   useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push("/login"); return; }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      setProfile(profile);
-      setNewGoal(profile?.monthly_goal ?? 49);
-
-      const { data: clients } = await supabase
-        .from("clients")
-        .select("id, marca, bandeira, operacao, plano, cluster, status, last_contact")
-        .eq("csm_id", id)
-        .eq("status", "ativo")
-        .order("marca")
-        .limit(10000);
-
-      setClients(clients ?? []);
-      setLoading(false);
-    }
-    load();
-  }, [id, router]);
-
-  async function handleSaveGoal() {
-    setSavingGoal(true);
-    await supabase
-      .from("profiles")
-      .update({ monthly_goal: parseInt(newGoal) })
-      .eq("id", id);
-    setProfile(profile ? { ...profile, monthly_goal: parseInt(newGoal) } : profile);
-    setEditingGoal(false);
-    setSavingGoal(false);
-  }
-
-  function daysSince(date: string | null): number {
-    if (!date) return 999;
-    return Math.floor((now - new Date(date).getTime()) / 86400000);
-  }
-
-  const filtered = clients.filter(c =>
-    c.marca.toLowerCase().includes(search.toLowerCase()) ||
-    c.bandeira?.includes(search)
-  );
-
-  const clusterLabel: Record<string, string> = {
-    high_touch: "High Touch",
-    mid_touch: "Mid Touch",
-    growth_touch: "Growth Touch",
-  };
-
-  const operacaoColor: Record<string, string> = {
-    corridas: "bg-blue-100 text-blue-700",
-    entregas: "bg-orange-100 text-orange-700",
-  };
-
-  if (loading) return (
-    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
-      <p className="text-slate-400 text-sm">Carregando...</p>
-    </div>
-  );
+    router.replace(`/dashboard?csm=${id}`);
+  }, [router, id]);
 
   return (
-    <div className="min-h-screen bg-slate-800">
-      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
-          <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
-        </div>
-        <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Voltar</button>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-
-        {/* Header do CSM */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg font-semibold">
-                {profile?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">{profile?.full_name}</h2>
-                <p className="text-sm text-gray-400">{clients.length} clientes na carteira</p>
-              </div>
-            </div>
-
-            {/* Meta mensal */}
-            <div className="flex items-center gap-3">
-              {editingGoal ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={newGoal}
-                    onChange={(e) => setNewGoal(e.target.value)}
-                    className="w-20 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button
-                    onClick={handleSaveGoal}
-                    disabled={savingGoal}
-                    className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {savingGoal ? "Salvando..." : "Salvar"}
-                  </button>
-                  <button
-                    onClick={() => setEditingGoal(false)}
-                    className="text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <p className="text-xs text-gray-400">Meta mensal</p>
-                    <p className="text-lg font-semibold text-gray-900">{profile?.monthly_goal} consultorias de produto</p>
-                  </div>
-                  <button
-                    onClick={() => setEditingGoal(true)}
-                    className="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 px-3 py-1.5 rounded-lg"
-                  >
-                    Editar
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Lista de clientes */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
-            <h3 className="font-medium text-gray-900">Carteira</h3>
-            <span className="text-xs text-gray-400">{filtered.length} clientes</span>
-          </div>
-          <div className="px-6 py-3 border-b border-slate-200/60">
-            <input
-              type="text"
-              placeholder="Buscar por nome ou bandeira..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          {filtered.length === 0 ? (
-            <div className="px-6 py-12 text-center text-gray-400 text-sm">Nenhum cliente encontrado.</div>
-          ) : (
-            <ul className="divide-y divide-slate-200/60">
-              {filtered.map((c) => (
-                <li
-                  key={c.id}
-                  onClick={() => router.push(`/clients/${c.id}`)}
-                  className="px-6 py-4 hover:bg-slate-100 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-gray-900">{c.marca}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${operacaoColor[c.operacao] ?? "bg-gray-100 text-gray-600"}`}>
-                          {c.operacao}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Bandeira {c.bandeira}
-                        {c.cluster ? ` · ${clusterLabel[c.cluster]}` : ""}
-                        {c.plano ? ` · ${c.plano.charAt(0).toUpperCase() + c.plano.slice(1)}` : ""}
-                        {c.last_contact ? ` · último contato há ${daysSince(c.last_contact)} dias` : " · sem contato registrado"}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </main>
+    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+      <p className="text-slate-400 text-sm">Abrindo carteira do CSM...</p>
     </div>
   );
 }

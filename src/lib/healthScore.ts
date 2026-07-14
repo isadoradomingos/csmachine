@@ -35,6 +35,9 @@ export type ScoreRede = {
   operacao: string;
   score: number | null;
   banda: Banda;
+  sub_volume: number | null;
+  sub_queda: number | null;
+  sub_perdidas: number | null;
   n_centrais: number;
   volume_total: number;
 };
@@ -178,11 +181,24 @@ export function calcularHealthScore(centrais: CentralRaw[]): { porCentral: Score
       score = avaliaveis.reduce((a, m) => a + (m.score as number) * m.volume_janela, 0) / volumeTotal;
       score = Math.round(score * 10) / 10;
     }
+
+    // Média ponderada (pelo volume) de cada sub-nota, só das centrais que têm a sub-nota
+    function subAgregada(get: (m: ScoreCentral) => number | null): number | null {
+      const comValor = avaliaveis.filter(m => get(m) !== null);
+      const peso = comValor.reduce((a, m) => a + m.volume_janela, 0);
+      if (comValor.length === 0 || peso === 0) return null;
+      const media = comValor.reduce((a, m) => a + (get(m) as number) * m.volume_janela, 0) / peso;
+      return Math.round(media);
+    }
+
     porRede.push({
       rede,
       operacao,
       score,
       banda: banda(score),
+      sub_volume: subAgregada(m => m.sub_volume),
+      sub_queda: subAgregada(m => m.sub_queda),
+      sub_perdidas: subAgregada(m => m.sub_perdidas),
       n_centrais: membros.length,
       volume_total: volumeTotal,
     });

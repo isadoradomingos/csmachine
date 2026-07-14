@@ -25,6 +25,9 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteForm, setInviteForm] = useState({ full_name: "", email: "", role: "csm", monthly_goal: 49 });
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", email: "", monthly_goal: 49, hasMeta: true, role: "csm" });
+  const [savingEdit, setSavingEdit] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<"idle" | "success" | "error">("idle");
   const [inviteError, setInviteError] = useState("");
@@ -86,6 +89,75 @@ export default function AdminPage() {
     setInviteStatus("success");
     setInviting(false);
     setInviteForm({ full_name: "", email: "", role: "csm", monthly_goal: 49 });
+    await load();
+  }
+
+  async function abrirEdicao(u: User) {
+    // Busca o email atual via função segura
+    const { data: emailData } = await supabase.rpc("get_user_email", { user_id_input: u.id });
+    const roleCombo = u.roles.includes("admin") && u.roles.includes("csm")
+      ? "csm_admin"
+      : u.roles.includes("admin") ? "admin" : "csm";
+    setEditForm({
+      full_name: u.full_name ?? "",
+      email: emailData ?? "",
+      monthly_goal: u.monthly_goal ?? 49,
+      hasMeta: (u.monthly_goal ?? 0) > 0,
+      role: roleCombo,
+    });
+    setEditUser(u);
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editUser) return;
+    setSavingEdit(true);
+    const id = editUser.id;
+
+    await supabase.from("profiles").update({
+      full_name: editForm.full_name,
+      monthly_goal: editForm.hasMeta ? editForm.monthly_goal : null,
+    }).eq("id", id);
+
+    // Atualiza email se mudou
+    const { data: emailAtual } = await supabase.rpc("get_user_email", { user_id_input: id });
+    if (editForm.email && editForm.email !== emailAtual) {
+      await fetch("/api/update-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: id, email: editForm.email }),
+      });
+    }
+
+    // Atualiza roles
+    await supabase.from("user_roles").delete().eq("user_id", id);
+    if (editForm.role === "csm_admin") {
+      await supabase.from("user_roles").insert([
+        { user_id: id, role: "csm" },
+        { user_id: id, role: "admin" },
+      ]);
+    } else {
+      await supabase.from("user_roles").insert({ user_id: id, role: editForm.role });
+    }
+
+    setSavingEdit(false);
+    setEditUser(null);
+    await load();
+  }
+
+  async function handleToggleAtivo(desativar: boolean) {
+    if (!editUser) return;
+    const id = editUser.id;
+    const msg = desativar
+      ? `Desativar ${editUser.full_name}? O acesso será bloqueado e os clientes ficarão sem CSM.`
+      : `Reativar ${editUser.full_name}? O acesso será restaurado mas a carteira estará vazia.`;
+    if (!confirm(msg)) return;
+
+    await supabase.from("profiles").update({ ativo: !desativar }).eq("id", id);
+    if (desativar) {
+      await supabase.from("clients").update({ csm_id: null }).eq("csm_id", id);
+    }
+    setEditUser(null);
     await load();
   }
 
@@ -190,10 +262,12 @@ export default function AdminPage() {
                 {users.map((u) => (
                   <li
                     key={u.id}
-                    onClick={() => router.push(`/admin/usuario/${u.id}`)}
-                    className={`px-6 py-4 flex items-center justify-between cursor-pointer transition-colors ${u.ativo === false ? "bg-slate-100 opacity-60" : "hover:bg-slate-100"}`}
+                    className={`px-6 py-4 flex items-center justify-between transition-colors ${u.ativo === false ? "bg-slate-100 opacity-60" : "hover:bg-slate-100"}`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div
+                      onClick={() => router.push(`/dashboard?csm=${u.id}`)}
+                      className="flex items-center gap-3 cursor-pointer flex-1 min-w-0"
+                    >
                       <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold shrink-0 ${u.ativo === false ? "bg-gray-200 text-gray-500" : "bg-blue-100 text-blue-700"}`}>
                         {u.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
                       </div>
@@ -209,7 +283,21 @@ export default function AdminPage() {
                         </div>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-400">→</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); abrirEdicao(u); }}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-gray-500 hover:bg-slate-100 hover:text-gray-700 bg-white transition-colors"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => router.push(`/dashboard?csm=${u.id}`)}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                        title="Ver carteira"
+                      >
+                        Ver carteira →
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -266,6 +354,59 @@ export default function AdminPage() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar usuário */}
+      {editUser && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Editar usuário</h3>
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nome completo</label>
+                <input type="text" value={editForm.full_name} onChange={e => setEditForm({ ...editForm, full_name: e.target.value })} required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">E-mail</label>
+                <input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Perfil</label>
+                <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="csm">CSM</option>
+                  <option value="admin">Admin</option>
+                  <option value="csm_admin">CSM + Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-600 mb-2 cursor-pointer">
+                  <input type="checkbox" checked={editForm.hasMeta} onChange={e => setEditForm({ ...editForm, hasMeta: e.target.checked })} className="rounded" />
+                  Possui meta mensal de contatos
+                </label>
+                {editForm.hasMeta && (
+                  <input type="number" value={editForm.monthly_goal} onChange={e => setEditForm({ ...editForm, monthly_goal: parseInt(e.target.value) })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                )}
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setEditUser(null)} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+                <button type="submit" disabled={savingEdit} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                  {savingEdit ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+              <div className="pt-2 border-t border-gray-100">
+                {editUser.ativo !== false ? (
+                  <button type="button" onClick={() => handleToggleAtivo(true)} className="w-full rounded-lg border border-red-200 text-red-500 px-4 py-2 text-sm hover:bg-red-50 transition-colors">
+                    Desativar usuário
+                  </button>
+                ) : (
+                  <button type="button" onClick={() => handleToggleAtivo(false)} className="w-full rounded-lg border border-green-200 text-green-600 px-4 py-2 text-sm hover:bg-green-50 transition-colors">
+                    Reativar usuário
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       )}
