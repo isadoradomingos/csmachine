@@ -155,7 +155,7 @@ export function FilaPriorizacao({ clientes, onAbrirCliente, onContarCriticos }: 
   }, [itens, busca]);
 
   if (carregando) {
-    return <div className="h-64 animate-pulse rounded-xl bg-slate-100" />;
+    return <div className="h-64 animate-pulse rounded-xl bg-slate-50 dark:bg-slate-100" />;
   }
 
   return (

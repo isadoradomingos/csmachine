@@ -528,7 +528,7 @@ export default function ClientPage() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
       <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
@@ -539,8 +539,8 @@ export default function ClientPage() {
   const percepcaoAtual = contacts.find(c => c.percepcao) ?? null;
 
   return (
-    <div className="min-h-screen bg-slate-800">
-      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800">
+      <header className="sticky top-0 z-40 bg-white dark:bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MenuLateral />
           <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
@@ -552,7 +552,7 @@ export default function ClientPage() {
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
 
         {/* Header do cliente */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-3 flex-wrap">
@@ -584,7 +584,7 @@ export default function ClientPage() {
         </div>
 
         {/* Informações */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <h3 className="font-medium text-gray-900 mb-4">Informações</h3>
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <div>
@@ -626,7 +626,7 @@ export default function ClientPage() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="flex border-b border-slate-200/60">
             <button onClick={() => setActiveTab("contatos")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "contatos" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
               Registro de Contatos
@@ -709,7 +709,7 @@ export default function ClientPage() {
             {activeTab === "health" && (
               <div className="space-y-6">
                 {healthCarregando ? (
-                  <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-40 animate-pulse rounded-xl bg-slate-50 dark:bg-slate-100" />
                 ) : !healthScore ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center">
                     <p className="text-sm font-medium text-gray-500">Sem health score para este cliente</p>
@@ -835,7 +835,7 @@ export default function ClientPage() {
         </div>
 
         {/* Observações */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium text-gray-900">Observações</h3>
             {!editingObservacoes ? (

@@ -166,14 +166,14 @@ export default function AdminPage() {
   const roleColor = (role: string) => role === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700";
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
       <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-800">
-      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800">
+      <header className="sticky top-0 z-40 bg-white dark:bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MenuLateral />
           <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
@@ -184,12 +184,12 @@ export default function AdminPage() {
       <main className="max-w-5xl mx-auto px-6 py-8">
         {/* Título */}
         <div className="mb-6">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Administração</p>
-          <h2 className="text-2xl font-semibold text-white mt-1">Painel de Gestão</h2>
+          <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-slate-400 font-semibold">Administração</p>
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">Painel de Gestão</h2>
         </div>
 
         {/* Abas */}
-        <div className="flex gap-1 mb-6 border-b border-slate-700">
+        <div className="flex gap-1 mb-6 border-b border-slate-300 dark:border-slate-700">
           {([
             { id: "clientes", label: "Clientes" },
             { id: "equipe", label: "Equipe" },
@@ -198,7 +198,9 @@ export default function AdminPage() {
               key={aba.id}
               onClick={() => setAbaAtiva(aba.id)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                abaAtiva === aba.id ? "border-blue-500 text-white" : "border-transparent text-slate-400 hover:text-slate-200"
+                abaAtiva === aba.id
+                  ? "border-blue-500 text-blue-600 dark:text-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               {aba.label}
@@ -249,7 +251,7 @@ export default function AdminPage() {
             <RankingCsm />
 
             {/* Gestão de usuários */}
-            <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200/60 flex items-center justify-between">
                 <h3 className="font-medium text-gray-900">Usuários</h3>
                 <button
@@ -263,7 +265,7 @@ export default function AdminPage() {
                 {users.map((u) => (
                   <li
                     key={u.id}
-                    className={`px-6 py-4 flex items-center justify-between transition-colors ${u.ativo === false ? "bg-slate-100 opacity-60" : "hover:bg-slate-100"}`}
+                    className={`px-6 py-4 flex items-center justify-between transition-colors ${u.ativo === false ? "bg-slate-50 dark:bg-slate-100 opacity-60" : "hover:bg-slate-100"}`}
                   >
                     <div
                       onClick={() => router.push(`/dashboard?csm=${u.id}`)}

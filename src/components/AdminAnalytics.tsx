@@ -81,7 +81,7 @@ export function SeletorPeriodo({
     <div className="relative" ref={ref}>
       <button
         onClick={() => setAberto(a => !a)}
-        className="inline-flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-slate-100 transition-colors"
+        className="inline-flex items-center gap-2 rounded-lg bg-white dark:bg-slate-50 border border-slate-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-slate-100 transition-colors"
       >
         <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -140,7 +140,7 @@ export function SeletorCsm({
     <select
       value={csmFiltro}
       onChange={e => setCsmFiltro(e.target.value)}
-      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+      className="rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
     >
       <option value="">Todos os CSMs</option>
       {opcoes.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
@@ -276,7 +276,7 @@ export default function AdminAnalytics() {
 
   return (
     <div className="space-y-4 mb-8">
-      <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
+      <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
           <div>
             <p className="text-sm font-medium text-gray-700">Contatos registrados ao longo do tempo</p>
@@ -314,7 +314,7 @@ export default function AdminAnalytics() {
         )}
 
         {carregando ? (
-          <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
+          <div className="h-64 animate-pulse rounded-xl bg-slate-50 dark:bg-slate-100" />
         ) : serie.length === 0 ? (
           <p className="text-sm text-gray-400 py-16 text-center">Nenhum dado no período selecionado.</p>
         ) : (

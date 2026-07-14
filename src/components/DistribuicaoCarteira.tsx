@@ -85,11 +85,11 @@ export default function DistribuicaoCarteira() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Por cluster (pizza) */}
-      <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
+      <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
         <p className="text-sm font-medium text-gray-700 mb-1">Carteira por cluster</p>
         <p className="text-xs text-gray-400 mb-4">Distribuição dos {total} clientes ativos por nível de atendimento</p>
         {carregando ? (
-          <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
+          <div className="h-64 animate-pulse rounded-xl bg-slate-50 dark:bg-slate-100" />
         ) : porCluster.length === 0 ? (
           <p className="text-sm text-gray-400 py-16 text-center">Sem dados de cluster.</p>
         ) : (
@@ -106,11 +106,11 @@ export default function DistribuicaoCarteira() {
       </div>
 
       {/* Por operação (barras) */}
-      <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
+      <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
         <p className="text-sm font-medium text-gray-700 mb-1">Carteira por operação</p>
         <p className="text-xs text-gray-400 mb-4">Distribuição dos {total} clientes ativos por tipo de operação</p>
         {carregando ? (
-          <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
+          <div className="h-64 animate-pulse rounded-xl bg-slate-50 dark:bg-slate-100" />
         ) : porOperacao.length === 0 ? (
           <p className="text-sm text-gray-400 py-16 text-center">Sem dados de operação.</p>
         ) : (

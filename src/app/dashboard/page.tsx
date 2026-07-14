@@ -278,14 +278,14 @@ function DashboardInner() {
     .sort((a, b) => modalOrder === "desc" ? b.daysSinceContact - a.daysSinceContact : a.daysSinceContact - b.daysSinceContact);
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
       <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-800">
-      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800">
+      <header className="sticky top-0 z-40 bg-white dark:bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MenuLateral />
           <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
@@ -312,7 +312,7 @@ function DashboardInner() {
 
       <main className="max-w-5xl mx-auto px-6 py-8">
         {/* Abas */}
-        <div className="flex gap-1 mb-6 border-b border-slate-700">
+        <div className="flex gap-1 mb-6 border-b border-slate-300 dark:border-slate-700">
           {([
             { id: "carteira", label: "Minha carteira" },
             { id: "estatisticas", label: "Estatísticas gerais" },
@@ -321,7 +321,9 @@ function DashboardInner() {
               key={aba.id}
               onClick={() => setAbaAtiva(aba.id)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
-                abaAtiva === aba.id ? "border-blue-500 text-white" : "border-transparent text-slate-400 hover:text-slate-200"
+                abaAtiva === aba.id
+                  ? "border-blue-500 text-blue-600 dark:text-white"
+                  : "border-transparent text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
               }`}
             >
               {aba.label}
@@ -337,7 +339,7 @@ function DashboardInner() {
           const temMeta = goal > 0;
           const pct = temMeta ? Math.min(100, Math.round((contactCount / goal) * 100)) : 0;
           return (
-            <section className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm px-6 py-6 mb-6">
+            <section className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm px-6 py-6 mb-6">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Olá, {profile?.full_name?.split(" ")[0]} 👋</h2>
@@ -374,7 +376,7 @@ function DashboardInner() {
 
         {/* Cards indicadores */}
         <div className="grid sm:grid-cols-2 gap-4 mb-6">
-          <button onClick={() => setModal({ type: "fila" })} className="text-left bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer transition-all hover:shadow-md hover:border-blue-300 group">
+          <button onClick={() => setModal({ type: "fila" })} className="text-left bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer transition-all hover:shadow-md hover:border-blue-300 group">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium text-gray-600">Fila de priorização de contato</p>
               <span className="h-7 w-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
@@ -392,7 +394,7 @@ function DashboardInner() {
             </div>
           </button>
 
-          <button onClick={() => setModal({ type: "semretorno" })} className="text-left bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer transition-all hover:shadow-md hover:border-red-300 group">
+          <button onClick={() => setModal({ type: "semretorno" })} className="text-left bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 cursor-pointer transition-all hover:shadow-md hover:border-red-300 group">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium text-gray-600">Tentativas de contato sem retorno</p>
               <span className="h-7 w-7 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
@@ -411,14 +413,14 @@ function DashboardInner() {
 
         {/* Busca e filtros */}
         <div className="flex flex-wrap gap-3 mb-4">
-          <input type="text" placeholder="Buscar por nome ou bandeira..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input type="text" placeholder="Buscar por nome ou bandeira..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <div className="relative">
             <button
               onClick={() => {
                 setRascunho({ operacao: filterOperacao, cluster: filterCluster, banda: filterBanda, percepcao: filterPercepcao, ordem: sortOrder });
                 setShowFiltros(v => !v);
               }}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 hover:bg-slate-100 transition-colors"
+              className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm bg-white dark:bg-slate-50 hover:bg-slate-100 transition-colors"
             >
               <svg className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
@@ -508,7 +510,7 @@ function DashboardInner() {
         </div>
 
         {/* Lista */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200/70 flex items-center justify-between">
             <h3 className="font-medium text-gray-900">Sua carteira</h3>
             <span className="text-xs text-gray-400">{filtered.length} clientes</span>
@@ -728,7 +730,7 @@ function DashboardInner() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-800 flex items-center justify-center"><p className="text-slate-400 text-sm">Carregando...</p></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-100 dark:bg-slate-800 flex items-center justify-center"><p className="text-slate-400 text-sm">Carregando...</p></div>}>
       <DashboardInner />
     </Suspense>
   );

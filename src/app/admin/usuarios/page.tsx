@@ -120,14 +120,14 @@ export default function UsuariosPage() {
   const roleColor = (role: string) => role === "admin" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700";
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-800 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
       <p className="text-slate-400 text-sm">Carregando...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-800">
-      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800">
+      <header className="sticky top-0 z-40 bg-white dark:bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
@@ -138,8 +138,8 @@ export default function UsuariosPage() {
       <main className="max-w-3xl mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Administração</p>
-            <h2 className="text-2xl font-semibold text-white mt-1">Gerenciar usuários</h2>
+            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">Administração</p>
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">Gerenciar usuários</h2>
           </div>
           <button
             onClick={() => { setShowInvite(true); setInviteStatus("idle"); }}
@@ -150,7 +150,7 @@ export default function UsuariosPage() {
         </div>
 
         {/* Lista de usuários */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200/60">
             <h3 className="font-medium text-gray-900">{users.length} usuários cadastrados</h3>
           </div>

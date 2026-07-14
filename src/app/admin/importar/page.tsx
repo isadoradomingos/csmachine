@@ -297,8 +297,8 @@ export default function ImportarPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-800">
-      <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800">
+      <header className="sticky top-0 z-40 bg-white dark:bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
@@ -307,8 +307,8 @@ export default function ImportarPage() {
       </header>
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wider text-slate-400">Administração</p>
-          <h2 className="text-2xl font-semibold text-white mt-1">Importar carteira</h2>
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-slate-400">Administração</p>
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mt-1">Importar carteira</h2>
           <p className="text-gray-400 text-sm mt-1">Selecione a planilha e clique em Analisar para ver o que será alterado. Nada é gravado até você confirmar.</p>
         </div>
 
@@ -320,7 +320,7 @@ export default function ImportarPage() {
           <a href="/modelo_importacao.csv" download className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">↓ Baixar modelo</a>
         </div>
 
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <h3 className="font-medium text-gray-900 mb-4">Selecionar arquivo CSV</h3>
           <input key={fileKey} type="file" accept=".csv" onChange={handleFile} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
           <p className="text-xs text-gray-400 mt-2">Colunas: bandeira*, marca*, operacao*, csm*, cluster, plano</p>
@@ -342,7 +342,7 @@ export default function ImportarPage() {
         {/* Prévia da análise (antes de gravar) */}
         {analisado && !concluido && (
           <>
-            <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200/60">
                 <h3 className="font-medium text-gray-900">Prévia — o que será alterado</h3>
                 <div className="flex gap-6 text-sm flex-wrap mt-2">
@@ -352,7 +352,7 @@ export default function ImportarPage() {
                 </div>
               </div>
               <div className="px-6 py-3 border-b border-slate-200/60">
-                <input type="text" placeholder="Buscar por marca ou bandeira..." value={buscaPrevia} onChange={e => setBuscaPrevia(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="text" placeholder="Buscar por marca ou bandeira..." value={buscaPrevia} onChange={e => setBuscaPrevia(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <ul className="divide-y divide-slate-200/60 max-h-72 overflow-y-auto">
                 {rowsFiltradas.map((r, i) => (
@@ -369,7 +369,7 @@ export default function ImportarPage() {
               </ul>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-200/60">
                 <h3 className="font-medium text-gray-900">Clientes ativos fora da planilha</h3>
                 <p className="text-xs text-gray-500 mt-1">
@@ -393,7 +393,7 @@ export default function ImportarPage() {
                     <span className="text-gray-400 ml-auto">{selecionados.size} selecionado(s)</span>
                   </div>
                   <div className="px-6 py-3 border-b border-slate-200/60">
-                    <input type="text" placeholder="Buscar por marca ou bandeira..." value={buscaAusentes} onChange={e => setBuscaAusentes(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="text" placeholder="Buscar por marca ou bandeira..." value={buscaAusentes} onChange={e => setBuscaAusentes(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <ul className="divide-y divide-slate-200/60 max-h-72 overflow-y-auto">
                     {ausentesFiltrados.length === 0 ? (
@@ -417,7 +417,7 @@ export default function ImportarPage() {
             </div>
 
             {/* Barra de confirmação final */}
-            <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 flex items-center justify-between flex-wrap gap-3">
+            <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5 flex items-center justify-between flex-wrap gap-3">
               <p className="text-sm text-gray-600">
                 Ao confirmar: <strong>{previa.adicionar}</strong> adicionados, <strong>{previa.atualizar}</strong> atualizados
                 {selecionados.size > 0 && <> e <strong className="text-red-600">{selecionados.size}</strong> inativados</>}.
@@ -434,7 +434,7 @@ export default function ImportarPage() {
 
         {/* Resultado final */}
         {concluido && (
-          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-200/60">
               <h3 className="font-medium text-gray-900">Importação concluída</h3>
               <div className="flex gap-6 text-sm flex-wrap mt-2">

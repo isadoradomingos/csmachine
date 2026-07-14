@@ -5,6 +5,7 @@ export type Profile = {
   full_name: string;
   monthly_goal: number | null;
   ativo?: boolean | null;
+  tema?: "light" | "dark" | null;
 };
 
 export type Client = {

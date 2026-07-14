@@ -179,8 +179,8 @@ export default function HealthScorePage() {
   const totalRedes = resumoRede ? resumoRede.Verde + resumoRede.Amarelo + resumoRede.Vermelho + resumoRede["N/A"] : 0;
 
   return (
-    <div className="min-h-screen bg-slate-800">
-      <header className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-800">
+      <header className="bg-white dark:bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <h1 className="font-semibold text-gray-900">Health Score</h1>
         <button onClick={() => router.push("/admin")} className="text-sm text-gray-500 hover:text-gray-700">← Voltar ao admin</button>
       </header>
@@ -196,14 +196,14 @@ export default function HealthScorePage() {
         </div>
 
         {/* Passo 1 — Importar planilha */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <p className="text-sm font-semibold text-gray-700 mb-1">1. Importar planilha de dados</p>
           <p className="text-xs text-gray-400 mb-4">Suba o CSV com os dados das centrais. Revise as redes e grave. Reimportar atualiza os meses presentes no arquivo.</p>
           <ImportarHealthScore />
         </div>
 
         {/* Passo 2 — Ação de recalcular */}
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+        <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <p className="text-sm font-semibold text-gray-700">2. Recalcular Health Score</p>
@@ -229,7 +229,7 @@ export default function HealthScorePage() {
         {carregando ? (
           <div className="h-32 animate-pulse rounded-2xl bg-slate-700/40" />
         ) : resumoRede ? (
-          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+          <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
             <p className="text-sm font-medium text-gray-700 mb-1">Distribuição das redes por banda</p>
             <p className="text-xs text-gray-400 mb-4">{totalRedes} redes classificadas</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -247,7 +247,7 @@ export default function HealthScorePage() {
             </div>
           </div>
         ) : (
-          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center">
+          <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center">
             <p className="text-sm text-gray-500">Nenhum score calculado ainda. Clique em “Recalcular Health Score” para gerar.</p>
           </div>
         )}

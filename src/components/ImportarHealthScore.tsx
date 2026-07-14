@@ -271,7 +271,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (ce
 
         {/* Upload */}
         {!analisado && !concluido && (
-          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center">
+          <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center">
             <p className="text-sm text-gray-600 mb-4">Selecione o arquivo CSV com os dados das centrais</p>
             <input
               key={fileKey}
@@ -290,15 +290,15 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (ce
         {analisado && !concluido && (
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+              <div className="bg-white dark:bg-slate-50 rounded-xl border border-slate-200/80 p-4">
                 <p className="text-xs text-gray-400">Centrais</p>
                 <p className="text-2xl font-semibold text-gray-900">{centrais.length}</p>
               </div>
-              <div className="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+              <div className="bg-white dark:bg-slate-50 rounded-xl border border-slate-200/80 p-4">
                 <p className="text-xs text-gray-400">Redes formadas</p>
                 <p className="text-2xl font-semibold text-gray-900">{redes.length}</p>
               </div>
-              <div className="bg-slate-50 rounded-xl border border-slate-200/80 p-4">
+              <div className="bg-white dark:bg-slate-50 rounded-xl border border-slate-200/80 p-4">
                 <p className="text-xs text-gray-400">Registros mensais</p>
                 <p className="text-2xl font-semibold text-gray-900">{totalMensais}</p>
               </div>
@@ -312,7 +312,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (ce
               </p>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-200/60">
                 <input
                   value={buscaRede}
@@ -323,7 +323,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (ce
               </div>
               <div className="max-h-96 overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-100 sticky top-0">
+                  <thead className="bg-slate-50 dark:bg-slate-100 sticky top-0">
                     <tr className="text-left text-xs text-gray-500">
                       <th className="px-5 py-2 font-medium">Rede</th>
                       <th className="px-5 py-2 font-medium">Centrais</th>
@@ -363,7 +363,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (ce
 
         {/* Concluído */}
         {concluido && (
-          <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center">
+          <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-8 text-center">
             <div className="h-12 w-12 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto mb-4 text-2xl">✓</div>
             <p className="text-lg font-semibold text-gray-900 mb-1">Dados importados com sucesso</p>
             <p className="text-sm text-gray-500 mb-6">

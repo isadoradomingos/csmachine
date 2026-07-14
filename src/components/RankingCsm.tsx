@@ -115,7 +115,7 @@ export default function RankingCsm() {
   const alturaPorCsm = Math.max(48, barrasPorCsm * 16);
 
   return (
-    <div className="bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
+    <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
       <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
         <div>
           <p className="text-sm font-medium text-gray-700 mb-1">Número de contatos registrados por CSM</p>
@@ -124,7 +124,7 @@ export default function RankingCsm() {
         <SeletorPeriodo preset={preset} setPreset={setPreset} custom={custom} setCustom={setCustom} />
       </div>
       {carregando ? (
-        <div className="h-64 animate-pulse rounded-xl bg-slate-100" />
+        <div className="h-64 animate-pulse rounded-xl bg-slate-50 dark:bg-slate-100" />
       ) : dados.length === 0 ? (
         <p className="text-sm text-gray-400 py-16 text-center">Nenhum contato registrado no período.</p>
       ) : (
