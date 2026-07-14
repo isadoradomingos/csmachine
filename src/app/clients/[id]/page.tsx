@@ -6,6 +6,7 @@ import Image from "next/image";
 import type { Client } from "@/lib/types";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { SeletorPercepcao, EtiquetaPercepcao, type Percepcao } from "@/components/Percepcao";
+import MenuLateral from "@/components/MenuLateral";
 
 type Contact = {
   id: string;
@@ -541,6 +542,7 @@ export default function ClientPage() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <MenuLateral />
           <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
@@ -647,8 +649,12 @@ export default function ClientPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setShowTentativaModal(true)}
-                      className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                      className="text-xs border border-gray-200 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors inline-flex items-center gap-1.5"
                     >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" />
+                        <line x1="22" y1="2" x2="2" y2="22" />
+                      </svg>
                       Registrar tentativa de contato
                     </button>
                     <button

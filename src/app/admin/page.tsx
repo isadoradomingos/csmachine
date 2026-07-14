@@ -10,6 +10,7 @@ import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
 import RankingCsm from "@/components/RankingCsm";
 import SaudeCarteira from "@/components/SaudeCarteira";
 import BuscaClientes from "@/components/BuscaClientes";
+import MenuLateral from "@/components/MenuLateral";
 
 type User = {
   id: string;
@@ -174,10 +175,10 @@ export default function AdminPage() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <MenuLateral />
           <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
-        <button onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }} className="text-sm text-red-500 hover:text-red-700">Sair</button>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8">

@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SaudeCarteira from "@/components/SaudeCarteira";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
 import { FilaPriorizacao } from "@/components/FilaPriorizacao";
+import MenuLateral from "@/components/MenuLateral";
 
 type ConsultoriaCliente = { id: string; marca: string; bandeira: string | null; csm_id: string | null };
 type ConsultoriaMes = { client_id: string; date: string; clients: ConsultoriaCliente | ConsultoriaCliente[] | null };
@@ -36,6 +37,15 @@ function DashboardInner() {
   const [filterOperacao, setFilterOperacao] = useState("");
   const [filterCluster, setFilterCluster] = useState("");
   const [sortOrder, setSortOrder] = useState<"" | "recente" | "antigo">("");
+  // Filtros novos (aplicados)
+  const [filterBanda, setFilterBanda] = useState("");
+  const [filterPercepcao, setFilterPercepcao] = useState("");
+  // Painel de filtros (rascunho até clicar em Aplicar)
+  const [showFiltros, setShowFiltros] = useState(false);
+  const [rascunho, setRascunho] = useState({ operacao: "", cluster: "", banda: "", percepcao: "", ordem: "" as "" | "recente" | "antigo" });
+  // Mapas por cliente
+  const [bandaPorCliente, setBandaPorCliente] = useState<Record<string, string>>({});
+  const [percepcaoPorCliente, setPercepcaoPorCliente] = useState<Record<string, string>>({});
   const [contactCount, setContactCount] = useState(0);
   const [tentativasMap, setTentativasMap] = useState<Record<string, number>>({});
   const [consultoriasSet, setConsultoriasSet] = useState<Set<string>>(new Set());
@@ -166,6 +176,47 @@ function DashboardInner() {
     });
 
     setSemRetornoClients(semRetorno);
+
+    // Health Score por cliente (casa marca -> rede por nome normalizado) e percepção mais recente
+    const normNome = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const scorePorNome: Record<string, string> = {};
+    let hf = 0;
+    for (;;) {
+      const { data, error } = await supabase.from("hs_scores").select("rede, banda").eq("tipo", "rede").range(hf, hf + 999);
+      if (error || !data || data.length === 0) break;
+      for (const r of data as { rede: string; banda: string }[]) {
+        const k = normNome(r.rede);
+        if (k && !scorePorNome[k]) scorePorNome[k] = r.banda;
+      }
+      if (data.length < 1000) break;
+      hf += 1000;
+    }
+    const bandaMap: Record<string, string> = {};
+    (clients ?? []).forEach((c: Client) => { const b = scorePorNome[normNome(c.marca)]; if (b) bandaMap[c.id] = b; });
+    setBandaPorCliente(bandaMap);
+
+    // Percepção mais recente por cliente
+    const ids = (clients ?? []).map((c: Client) => c.id);
+    const percepMap: Record<string, string> = {};
+    if (ids.length > 0) {
+      let pf = 0;
+      for (;;) {
+        const { data, error } = await supabase.from("client_contacts")
+          .select("client_id, date, percepcao")
+          .in("client_id", ids)
+          .not("percepcao", "is", null)
+          .order("date", { ascending: false })
+          .range(pf, pf + 999);
+        if (error || !data || data.length === 0) break;
+        for (const row of data as { client_id: string; percepcao: string }[]) {
+          if (!percepMap[row.client_id]) percepMap[row.client_id] = row.percepcao;
+        }
+        if (data.length < 1000) break;
+        pf += 1000;
+      }
+    }
+    setPercepcaoPorCliente(percepMap);
+
     setLoading(false);
   }, [router, csmParam]);
 
@@ -177,10 +228,6 @@ function DashboardInner() {
     return () => window.removeEventListener("focus", load);
   }, [load]);
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push("/login");
-  }
 
   const followUpClients = clients
     .filter(c => daysSince(c.last_contact) > 20)
@@ -191,7 +238,9 @@ function DashboardInner() {
       const matchSearch = c.marca.toLowerCase().includes(search.toLowerCase()) || c.bandeira?.includes(search);
       const matchOperacao = filterOperacao ? c.operacao === filterOperacao : true;
       const matchCluster = filterCluster ? c.cluster === filterCluster : true;
-      return matchSearch && matchOperacao && matchCluster;
+      const matchBanda = filterBanda ? (bandaPorCliente[c.id] ?? "N/A") === filterBanda : true;
+      const matchPercepcao = filterPercepcao ? percepcaoPorCliente[c.id] === filterPercepcao : true;
+      return matchSearch && matchOperacao && matchCluster && matchBanda && matchPercepcao;
     })
     .sort((a, b) => {
       if (sortOrder === "recente") return daysSince(a.last_contact) - daysSince(b.last_contact);
@@ -238,12 +287,12 @@ function DashboardInner() {
     <div className="min-h-screen bg-slate-800">
       <header className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <MenuLateral />
           <Image src="/machine-logo.png" alt="Machine" width={32} height={32} className="h-8 w-8 object-contain" />
           <span className="text-lg font-semibold text-gray-900">Machine <span className="font-normal text-gray-400">· Customer Success</span></span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-600">{profile?.full_name}</span>
-          <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-red-500 transition-colors">Sair</button>
         </div>
       </header>
 
@@ -363,23 +412,99 @@ function DashboardInner() {
         {/* Busca e filtros */}
         <div className="flex flex-wrap gap-3 mb-4">
           <input type="text" placeholder="Buscar por nome ou bandeira..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          <select value={filterOperacao} onChange={(e) => setFilterOperacao(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
-            <option value="">Todas as operações</option>
-            <option value="corridas">Corridas</option>
-            <option value="entregas">Entregas</option>
-          </select>
-          <select value={filterCluster} onChange={(e) => setFilterCluster(e.target.value)} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
-            <option value="">Todos os clusters</option>
-            <option value="high_touch">High Touch</option>
-            <option value="mid_touch">Mid Touch</option>
-            <option value="growth_touch">Growth Touch</option>
-            <option value="no_touch">No Touch</option>
-          </select>
-          <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value as "" | "recente" | "antigo")} className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
-            <option value="">Ordem de contato</option>
-            <option value="recente">Contato mais recente</option>
-            <option value="antigo">Contato mais antigo</option>
-          </select>
+          <div className="relative">
+            <button
+              onClick={() => {
+                setRascunho({ operacao: filterOperacao, cluster: filterCluster, banda: filterBanda, percepcao: filterPercepcao, ordem: sortOrder });
+                setShowFiltros(v => !v);
+              }}
+              className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 hover:bg-slate-100 transition-colors"
+            >
+              <svg className="h-4 w-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              Filtro
+              {(() => {
+                const n = [filterOperacao, filterCluster, filterBanda, filterPercepcao, sortOrder].filter(Boolean).length;
+                return n > 0 ? <span className="ml-1 h-5 min-w-5 px-1.5 rounded-full bg-blue-600 text-white text-xs flex items-center justify-center">{n}</span> : null;
+              })()}
+            </button>
+
+            {showFiltros && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowFiltros(false)} />
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl border border-slate-200 shadow-lg z-40 p-4 space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Operação</label>
+                    <select value={rascunho.operacao} onChange={e => setRascunho({ ...rascunho, operacao: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Todas</option>
+                      <option value="corridas">Corridas</option>
+                      <option value="entregas">Entregas</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Cluster</label>
+                    <select value={rascunho.cluster} onChange={e => setRascunho({ ...rascunho, cluster: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Todos</option>
+                      <option value="high_touch">High Touch</option>
+                      <option value="mid_touch">Mid Touch</option>
+                      <option value="growth_touch">Growth Touch</option>
+                      <option value="no_touch">No Touch</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Health Score</label>
+                    <select value={rascunho.banda} onChange={e => setRascunho({ ...rascunho, banda: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Todos</option>
+                      <option value="Verde">Saudável</option>
+                      <option value="Amarelo">Em risco</option>
+                      <option value="Vermelho">Crítico</option>
+                      <option value="N/A">Não avaliado</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Percepção do CSM</label>
+                    <select value={rascunho.percepcao} onChange={e => setRascunho({ ...rascunho, percepcao: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Todas</option>
+                      <option value="estavel">Estável</option>
+                      <option value="atencao">Atenção</option>
+                      <option value="risco">Risco</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Ordem de contato</label>
+                    <select value={rascunho.ordem} onChange={e => setRascunho({ ...rascunho, ordem: e.target.value as "" | "recente" | "antigo" })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">Padrão</option>
+                      <option value="recente">Contato mais recente</option>
+                      <option value="antigo">Contato mais antigo</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={() => {
+                        setRascunho({ operacao: "", cluster: "", banda: "", percepcao: "", ordem: "" });
+                        setFilterOperacao(""); setFilterCluster(""); setFilterBanda(""); setFilterPercepcao(""); setSortOrder("");
+                        setShowFiltros(false);
+                      }}
+                      className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-gray-600 hover:bg-slate-50"
+                    >
+                      Limpar
+                    </button>
+                    <button
+                      onClick={() => {
+                        setFilterOperacao(rascunho.operacao); setFilterCluster(rascunho.cluster);
+                        setFilterBanda(rascunho.banda); setFilterPercepcao(rascunho.percepcao); setSortOrder(rascunho.ordem);
+                        setShowFiltros(false);
+                      }}
+                      className="flex-1 rounded-lg bg-blue-600 text-white px-3 py-2 text-sm font-medium hover:bg-blue-700"
+                    >
+                      Aplicar filtros
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Lista */}
