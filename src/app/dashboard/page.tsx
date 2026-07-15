@@ -177,22 +177,25 @@ function DashboardInner() {
 
     setSemRetornoClients(semRetorno);
 
-    // Health Score por cliente (casa marca -> rede por nome normalizado) e percepção mais recente
-    const normNome = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    const scorePorNome: Record<string, string> = {};
+    // Health Score por cliente (casa pelo código = clients.bandeira) e percepção mais recente
+    const bandaPorCodigo: Record<string, string> = {};
     let hf = 0;
     for (;;) {
-      const { data, error } = await supabase.from("hs_scores").select("rede, banda").eq("tipo", "rede").range(hf, hf + 999);
+      const { data, error } = await supabase.from("hs_scores").select("tipo, codigo, codigo_matriz, banda").range(hf, hf + 999);
       if (error || !data || data.length === 0) break;
-      for (const r of data as { rede: string; banda: string }[]) {
-        const k = normNome(r.rede);
-        if (k && !scorePorNome[k]) scorePorNome[k] = r.banda;
+      for (const r of data as { tipo: string; codigo: string | null; codigo_matriz: string | null; banda: string }[]) {
+        if (r.tipo === "rede" && r.codigo_matriz) {
+          bandaPorCodigo[String(r.codigo_matriz).trim()] = r.banda;
+        } else if (r.tipo === "central" && r.codigo) {
+          const k = String(r.codigo).trim();
+          if (!bandaPorCodigo[k]) bandaPorCodigo[k] = r.banda;
+        }
       }
       if (data.length < 1000) break;
       hf += 1000;
     }
     const bandaMap: Record<string, string> = {};
-    (clients ?? []).forEach((c: Client) => { const b = scorePorNome[normNome(c.marca)]; if (b) bandaMap[c.id] = b; });
+    (clients ?? []).forEach((c: Client) => { const b = c.bandeira ? bandaPorCodigo[String(c.bandeira).trim()] : undefined; if (b) bandaMap[c.id] = b; });
     setBandaPorCliente(bandaMap);
 
     // Percepção mais recente por cliente

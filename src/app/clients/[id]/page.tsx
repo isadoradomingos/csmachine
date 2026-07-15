@@ -8,6 +8,23 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { SeletorPercepcao, EtiquetaPercepcao, type Percepcao } from "@/components/Percepcao";
 import MenuLateral from "@/components/MenuLateral";
 
+type CentralHS = {
+  codigo: string | null;
+  nome: string;
+  tipo_central: string | null;  // Matriz | Filial
+  banda: string;
+  painel: number | null;
+  sub_volume: number | null;
+  sub_queda: number | null;
+  sub_perdidas: number | null;
+  sub_equilibrio: number | null;
+  sub_competitivo: number | null;
+  sub_financeiro: number | null;
+  sub_funcionalidades: number | null;
+  sub_uso: number | null;
+  status: string | null;
+};
+
 type Contact = {
   id: string;
   date: string;
@@ -213,7 +230,9 @@ export default function ClientPage() {
   const [saving, setSaving] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [activeTab, setActiveTab] = useState<"contatos" | "health" | "historico">("contatos");
-  const [healthScore, setHealthScore] = useState<{ score: number | null; banda: string; sub_volume: number | null; sub_queda: number | null; sub_perdidas: number | null; operacao: string; rede: string; parcial: boolean } | null>(null);
+  const [healthScore, setHealthScore] = useState<{ score: number | null; banda: string; nps: number | null; suporte: number | null; saude_filiais: number | null; operacao: string; rede: string; n_centrais: number | null } | null>(null);
+  const [centraisRede, setCentraisRede] = useState<CentralHS[]>([]);
+  const [centralExpandida, setCentralExpandida] = useState<string | null>(null);
   const [healthCarregando, setHealthCarregando] = useState(true);
   const [auditLimit, setAuditLimit] = useState(10);
   const [form, setForm] = useState<{ type: string; date: string; note: string; canal: string; percepcao: Percepcao }>({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null });
@@ -264,52 +283,67 @@ export default function ClientPage() {
     });
   }
 
-  // Normaliza nome para casamento aproximado (ignora acento, maiúscula, espaço e pontuação)
-  function normalizar(s: string): string {
-    return (s ?? "")
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, ""); // remove espaços, hífens, pontuação
-  }
-
-  async function carregarHealthScore(marca: string) {
+  async function carregarHealthScore(bandeira: string | null) {
     setHealthCarregando(true);
-    const alvo = normalizar(marca);
-    if (!alvo) { setHealthScore(null); setHealthCarregando(false); return; }
+    setCentraisRede([]);
+    setCentralExpandida(null);
+    const codigo = (bandeira ?? "").trim();
+    if (!codigo) { setHealthScore(null); setHealthCarregando(false); return; }
 
-    type RedeScore = { rede: string; operacao: string; score: number | null; banda: string; sub_volume: number | null; sub_queda: number | null; sub_perdidas: number | null; parcial: boolean };
+    const camposRede = "rede, operacao, score, banda, nps, suporte, saude_filiais, n_centrais, codigo_matriz";
+    const camposCentral = "codigo, nome, tipo_central, banda, painel, sub_volume, sub_queda, sub_perdidas, sub_equilibrio, sub_competitivo, sub_financeiro, sub_funcionalidades, sub_uso, status, rede";
 
-    // 1) Tenta casamento exato no banco (cobre a maioria, ex: "Up City Brasil")
-    const { data: exato } = await supabase
-      .from("hs_scores")
-      .select("rede, operacao, score, banda, sub_volume, sub_queda, sub_perdidas, parcial")
-      .eq("tipo", "rede")
-      .eq("rede", marca)
-      .limit(1);
+    type RedeRow = { rede: string; operacao: string; score: number | null; banda: string; nps: number | null; suporte: number | null; saude_filiais: number | null; n_centrais: number | null; codigo_matriz: string | null };
 
-    if (exato && exato.length > 0) {
-      setHealthScore(exato[0] as RedeScore);
-      setHealthCarregando(false);
-      return;
+    // 1) Descobre a REDE do cliente: primeiro tenta pela matriz (codigo_matriz = código),
+    //    senão pela central (codigo = código) e pega o nome da rede dela.
+    let nomeRede: string | null = null;
+
+    const { data: redePorMatriz } = await supabase
+      .from("hs_scores").select(camposRede)
+      .eq("tipo", "rede").eq("codigo_matriz", codigo).limit(1);
+
+    if (redePorMatriz && redePorMatriz.length > 0) {
+      const r = redePorMatriz[0] as RedeRow;
+      nomeRede = r.rede;
+      setHealthScore({ score: r.score, banda: r.banda, nps: r.nps, suporte: r.suporte, saude_filiais: r.saude_filiais, operacao: r.operacao, rede: r.rede, n_centrais: r.n_centrais });
+    } else {
+      // acha a central pelo código e descobre a rede dela
+      const { data: central } = await supabase
+        .from("hs_scores").select("rede").eq("tipo", "central").eq("codigo", codigo).limit(1);
+      if (central && central.length > 0) {
+        nomeRede = (central[0] as { rede: string }).rede;
+        // busca a linha de rede correspondente (se houver) pro cabeçalho
+        const { data: redeDaCentral } = await supabase
+          .from("hs_scores").select(camposRede).eq("tipo", "rede").eq("rede", nomeRede).limit(1);
+        if (redeDaCentral && redeDaCentral.length > 0) {
+          const r = redeDaCentral[0] as RedeRow;
+          setHealthScore({ score: r.score, banda: r.banda, nps: r.nps, suporte: r.suporte, saude_filiais: r.saude_filiais, operacao: r.operacao, rede: r.rede, n_centrais: r.n_centrais });
+        } else {
+          setHealthScore(null);
+        }
+      } else {
+        setHealthScore(null);
+      }
     }
 
-    // 2) Fallback: busca ampla COM paginação (cobre divergências de acento/espaço/caixa)
-    const todas: RedeScore[] = [];
-    let from = 0;
-    for (;;) {
-      const { data, error } = await supabase
-        .from("hs_scores")
-        .select("rede, operacao, score, banda, sub_volume, sub_queda, sub_perdidas, parcial")
-        .eq("tipo", "rede")
-        .range(from, from + 999);
-      if (error || !data || data.length === 0) break;
-      todas.push(...(data as RedeScore[]));
-      if (data.length < 1000) break;
-      from += 1000;
+    // 2) Busca TODAS as centrais dessa rede (matriz + filiais)
+    if (nomeRede) {
+      const { data: centrais } = await supabase
+        .from("hs_scores").select(camposCentral)
+        .eq("tipo", "central").eq("rede", nomeRede);
+      if (centrais && centrais.length > 0) {
+        // ordena: matriz primeiro, depois por painel desc
+        const lista = (centrais as (CentralHS & { rede: string })[]).sort((a, b) => {
+          const am = a.tipo_central === "Matriz" ? 0 : 1;
+          const bm = b.tipo_central === "Matriz" ? 0 : 1;
+          if (am !== bm) return am - bm;
+          return (b.painel ?? -1) - (a.painel ?? -1);
+        });
+        setCentraisRede(lista);
+      }
     }
 
-    const match = todas.find(r => normalizar(r.rede) === alvo);
-    setHealthScore(match ?? null);
     setHealthCarregando(false);
   }
 
@@ -329,8 +363,8 @@ export default function ClientPage() {
       setObservacoes(client.observacoes ?? "");
       setSavedObservacoes(client.observacoes ?? "");
 
-      // Health Score: casa a marca do cliente com a rede (nome normalizado, aproximado)
-      void carregarHealthScore(client.marca);
+      // Health Score: casa o código do cliente (bandeira) com a central/rede
+      void carregarHealthScore(client.bandeira);
 
       if (client.csm_id) {
         const { data: profile } = await supabase
@@ -732,6 +766,13 @@ export default function ClientPage() {
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Health Score da rede</p>
                               <p className="text-sm text-gray-500 mt-0.5">{healthScore.rede} · {healthScore.operacao}</p>
+                              <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                {healthScore.n_centrais !== null && (
+                                  <span className="text-xs text-gray-500">{healthScore.n_centrais} {healthScore.n_centrais === 1 ? "central" : "centrais"}</span>
+                                )}
+                                {healthScore.nps !== null && <span className="text-xs text-gray-500">NPS: <span className="font-medium text-gray-700">{Math.round(healthScore.nps)}</span></span>}
+                                {healthScore.suporte !== null && <span className="text-xs text-gray-500">Suporte: <span className="font-medium text-gray-700">{Math.round(healthScore.suporte)}</span></span>}
+                              </div>
                             </div>
                             <div className="flex items-center gap-4">
                               <div className="text-right">
@@ -749,41 +790,77 @@ export default function ClientPage() {
                       );
                     })()}
 
-                    {/* Sub-notas do bloco Uso */}
+                    {/* Lista de centrais da rede (matriz + filiais), expansível */}
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Fatores avaliados (bloco Uso)</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        {([
-                          { rotulo: "Volume relativo", valor: healthScore.sub_volume, ajuda: "Volume de operação frente à mediana do plano" },
-                          { rotulo: "Perfil de queda", valor: healthScore.sub_queda, ajuda: "Velocidade de queda nos últimos meses" },
-                          { rotulo: "Taxa de perdidas", valor: healthScore.sub_perdidas, ajuda: "Proporção de solicitações canceladas" },
-                        ] as const).map(sub => {
-                          const v = sub.valor;
-                          const corSub = v === null ? "#94a3b8" : v >= 100 ? "#16a34a" : v >= 50 ? "#f59e0b" : "#dc2626";
-                          const rotuloSub = v === null ? "N/A" : v >= 100 ? "Bom" : v >= 50 ? "Atenção" : "Crítico";
-                          return (
-                            <div key={sub.rotulo} className="rounded-xl border border-slate-200/70 bg-white p-4">
-                              <p className="text-sm font-medium text-gray-700">{sub.rotulo}</p>
-                              <p className="text-xs text-gray-400 mt-0.5 mb-2">{sub.ajuda}</p>
-                              <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ background: corSub }}>
-                                {rotuloSub}{v !== null ? ` · ${v}` : ""}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
+                        Centrais da rede {centraisRede.length > 0 ? `(${centraisRede.length})` : ""}
+                      </p>
+                      {centraisRede.length === 0 ? (
+                        <p className="text-sm text-gray-400">Nenhuma central detalhada encontrada para esta rede.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {centraisRede.map(central => {
+                            const cb = central.banda;
+                            const corC = cb === "Verde" ? "#16a34a" : cb === "Amarelo" ? "#f59e0b" : cb === "Vermelho" ? "#dc2626" : "#94a3b8";
+                            const ehCliente = (central.codigo ?? "") === (client.bandeira ?? "");
+                            const expandida = centralExpandida === central.codigo;
+                            return (
+                              <div key={central.codigo ?? central.nome} className={`rounded-xl border ${ehCliente ? "border-blue-300 ring-1 ring-blue-200" : "border-slate-200/70"} bg-white overflow-hidden`}>
+                                <button
+                                  onClick={() => setCentralExpandida(expandida ? null : central.codigo)}
+                                  className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                                >
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: corC }} />
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-gray-800 truncate">
+                                        {central.nome}
+                                        {ehCliente && <span className="ml-2 text-xs text-blue-600 font-normal">(este cliente)</span>}
+                                      </p>
+                                      <p className="text-xs text-gray-400">{central.tipo_central ?? ""}{central.status && central.status !== "ATIVA" ? ` · ${central.status}` : ""}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 shrink-0">
+                                    <span className="text-sm font-semibold" style={{ color: corC }}>
+                                      {central.painel !== null ? Math.round(central.painel) : "—"}
+                                    </span>
+                                    <span className="text-gray-300 text-xs">{expandida ? "▲" : "▼"}</span>
+                                  </div>
+                                </button>
+                                {expandida && (
+                                  <div className="px-4 pb-4 pt-1 border-t border-slate-100">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
+                                      {([
+                                        { rotulo: "Volume", valor: central.sub_volume },
+                                        { rotulo: "Queda", valor: central.sub_queda },
+                                        { rotulo: "Perdidas", valor: central.sub_perdidas },
+                                        { rotulo: "Equilíbrio", valor: central.sub_equilibrio },
+                                        { rotulo: "Competitividade", valor: central.sub_competitivo },
+                                        { rotulo: "Financeiro", valor: central.sub_financeiro },
+                                        { rotulo: "Funcionalidades", valor: central.sub_funcionalidades },
+                                        { rotulo: "Uso", valor: central.sub_uso },
+                                      ] as const).map(sub => {
+                                        const v = sub.valor;
+                                        const corSub = v === null ? "#94a3b8" : v >= 75 ? "#16a34a" : v >= 40 ? "#f59e0b" : "#dc2626";
+                                        const rotuloSub = v === null ? "N/A" : v >= 75 ? "Bom" : v >= 40 ? "Atenção" : "Crítico";
+                                        return (
+                                          <div key={sub.rotulo} className="rounded-lg border border-slate-100 p-2.5">
+                                            <p className="text-xs text-gray-500 mb-1">{sub.rotulo}</p>
+                                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold text-white" style={{ background: corSub }}>
+                                              {rotuloSub}{v !== null ? ` · ${Math.round(v)}` : ""}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-
-                    {healthScore.parcial && (
-                      <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-                        <p className="text-xs text-amber-900">
-                          <span className="font-semibold">Score parcial.</span> Esta nota considera apenas o bloco de Uso
-                          &amp; engajamento (Volume, Queda e Taxa de perdidas). Os demais critérios do modelo
-                          (Equilíbrio, Financeiro, Funcionalidades, NPS, Suporte e Filiais) serão incorporados conforme
-                          os dados forem importados.
-                        </p>
-                      </div>
-                    )}
                   </>
                 )}
               </div>

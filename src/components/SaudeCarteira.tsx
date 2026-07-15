@@ -17,6 +17,7 @@ type RedeScore = {
   sub_volume: number | null;
   sub_queda: number | null;
   sub_perdidas: number | null;
+  codigo_matriz: string | null;
   client_id: string | null;
 };
 
@@ -63,14 +64,14 @@ export default function SaudeCarteira() {
     for (;;) {
       const { data, error } = await supabase
         .from("hs_scores")
-        .select("rede, operacao, score, banda, sub_volume, sub_queda, sub_perdidas, client_id, calculado_em")
+        .select("rede, operacao, score, banda, sub_volume, sub_queda, sub_perdidas, codigo_matriz, client_id, importado_em")
         .eq("tipo", "rede")
         .order("score", { ascending: true, nullsFirst: false })
         .range(from, from + 999);
       if (error || !data || data.length === 0) break;
-      for (const row of data as (RedeScore & { calculado_em: string })[]) {
+      for (const row of data as (RedeScore & { importado_em: string })[]) {
         linhas.push(row);
-        if (row.calculado_em > maisRecente) maisRecente = row.calculado_em;
+        if (row.importado_em > maisRecente) maisRecente = row.importado_em;
       }
       if (data.length < 1000) break;
       from += 1000;
@@ -78,17 +79,17 @@ export default function SaudeCarteira() {
 
     if (linhas.length === 0) { setSemDados(true); setCarregando(false); return; }
 
-    // Carrega clientes para casar rede -> cliente por nome (client_id não é preenchido no hs_scores)
+    // Carrega clientes para casar rede -> cliente pelo CÓDIGO (clients.bandeira = codigo_matriz)
     const mapaClientes: Record<string, string> = {};
     let cf = 0;
     for (;;) {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, marca")
+        .select("id, bandeira")
         .range(cf, cf + 999);
       if (error || !data || data.length === 0) break;
-      for (const c of data as { id: string; marca: string }[]) {
-        const chave = norm(c.marca);
+      for (const c of data as { id: string; bandeira: string | null }[]) {
+        const chave = (c.bandeira ?? "").trim();
         if (chave && !mapaClientes[chave]) mapaClientes[chave] = c.id;
       }
       if (data.length < 1000) break;
@@ -136,7 +137,6 @@ export default function SaudeCarteira() {
             {ultimo ? ` · atualizado em ${new Date(ultimo).toLocaleDateString("pt-BR")}` : ""}
           </p>
         </div>
-        <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-medium">Score parcial</span>
       </div>
 
       {carregando ? (
@@ -220,7 +220,7 @@ export default function SaudeCarteira() {
                 <li className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma rede encontrada.</li>
               ) : redesFiltradas.map((r, i) => {
                 const cor = CORES[r.banda];
-                const clientId = r.client_id ?? clientesPorNome[norm(r.rede)] ?? null;
+                const clientId = r.client_id ?? (r.codigo_matriz ? clientesPorNome[String(r.codigo_matriz).trim()] : null) ?? null;
                 const clicavel = !!clientId;
                 return (
                   <li key={`${r.rede}-${r.operacao}-${i}`}>

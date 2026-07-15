@@ -31,7 +31,7 @@ const ROTULO_BANDA: Record<string, string> = {
 };
 
 // Prioridade base pela banda
-const BASE_BANDA: Record<string, number> = { Vermelho: 100, Amarelo: 60, "N/A": 40, Verde: 20 };
+const BASE_BANDA: Record<string, number> = { Vermelho: 100, Amarelo: 60, Verde: 20, "N/A": 10 };
 // Ajuste pela percepção do CSM
 const AJUSTE_PERCEP: Record<string, number> = { risco: 30, atencao: 0, estavel: -30 };
 
@@ -55,19 +55,23 @@ export function FilaPriorizacao({ clientes, onAbrirCliente, onContarCriticos }: 
     setCarregando(true);
     if (clientes.length === 0) { setItens([]); setCarregando(false); return; }
 
-    // 1) Health score das redes (paginado) -> mapa por nome normalizado
-    const scorePorNome: Record<string, { score: number | null; banda: string }> = {};
+    // 1) Health score (paginado) -> mapas por código: rede (codigo_matriz) e central (codigo)
+    const scorePorCodigo: Record<string, { score: number | null; banda: string }> = {};
     let from = 0;
     for (;;) {
       const { data, error } = await supabase
         .from("hs_scores")
-        .select("rede, score, banda")
-        .eq("tipo", "rede")
+        .select("tipo, codigo, codigo_matriz, score, banda")
         .range(from, from + 999);
       if (error || !data || data.length === 0) break;
-      for (const r of data as { rede: string; score: number | null; banda: string }[]) {
-        const chave = norm(r.rede);
-        if (chave && !scorePorNome[chave]) scorePorNome[chave] = { score: r.score, banda: r.banda };
+      for (const r of data as { tipo: string; codigo: string | null; codigo_matriz: string | null; score: number | null; banda: string }[]) {
+        // rede tem prioridade (score mais completo); indexa pelo código da matriz
+        if (r.tipo === "rede" && r.codigo_matriz) {
+          scorePorCodigo[String(r.codigo_matriz).trim()] = { score: r.score, banda: r.banda };
+        } else if (r.tipo === "central" && r.codigo) {
+          const k = String(r.codigo).trim();
+          if (!scorePorCodigo[k]) scorePorCodigo[k] = { score: r.score, banda: r.banda };
+        }
       }
       if (data.length < 1000) break;
       from += 1000;
@@ -98,14 +102,14 @@ export function FilaPriorizacao({ clientes, onAbrirCliente, onContarCriticos }: 
 
     // 3) Monta os itens com prioridade
     const lista: ItemFila[] = clientes.map(c => {
-      const hs = scorePorNome[norm(c.marca)];
+      const hs = c.bandeira ? scorePorCodigo[String(c.bandeira).trim()] : undefined;
       const banda = hs?.banda ?? "N/A";
       const score = hs?.score ?? null;
       const p = percepPorCliente[c.id];
       const percepcao = p?.percepcao ?? null;
       const percepcaoData = p?.data ?? null;
 
-      const base = BASE_BANDA[banda] ?? 40;
+      const base = BASE_BANDA[banda] ?? 10;
       const ajuste = percepcao ? (AJUSTE_PERCEP[percepcao] ?? 0) : 0;
       const prioridade = base + ajuste;
 
