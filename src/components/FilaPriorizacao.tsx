@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { EtiquetaPercepcao, type Percepcao } from "@/components/Percepcao";
 
@@ -50,6 +50,17 @@ export function FilaPriorizacao({ clientes, onAbrirCliente, onContarCriticos }: 
   const [itens, setItens] = useState<ItemFila[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [busca, setBusca] = useState("");
+
+  // Mantém o callback numa ref para não virar dependência do montar (evita loop de recarga).
+  const onContarRef = useRef(onContarCriticos);
+  useEffect(() => { onContarRef.current = onContarCriticos; }, [onContarCriticos]);
+
+  // Assinatura estável da carteira: só muda quando os IDs realmente mudam,
+  // não quando o array é recriado com o mesmo conteúdo.
+  const assinaturaClientes = useMemo(
+    () => clientes.map(c => c.id).sort().join(","),
+    [clientes]
+  );
 
   const montar = useCallback(async () => {
     setCarregando(true);
@@ -142,15 +153,19 @@ export function FilaPriorizacao({ clientes, onAbrirCliente, onContarCriticos }: 
     setItens(lista);
     // Críticos = banda Vermelho OU percepção de risco
     const criticos = lista.filter(i => i.banda === "Vermelho" || i.percepcao === "risco").length;
-    if (onContarCriticos) onContarCriticos(criticos);
+    if (onContarRef.current) onContarRef.current(criticos);
     setCarregando(false);
-  }, [clientes, onContarCriticos]);
+  }, [clientes]);
 
   useEffect(() => {
     // montar é async; setState após await não é síncrono.
+    // Dispara pela assinatura estável (IDs), não pela referência do array,
+    // para o card não recarregar quando o pai re-renderiza sem mudar a carteira.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     montar();
-  }, [montar]);
+  // Intencional: depende só da assinatura estável, não de `montar`/`clientes`.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assinaturaClientes]);
 
   const filtrados = useMemo(() => {
     const t = norm(busca.trim());

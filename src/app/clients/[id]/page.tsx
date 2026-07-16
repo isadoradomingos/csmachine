@@ -28,7 +28,7 @@ type CentralHS = {
 type Contact = {
   id: string;
   date: string;
-  type: "tentativa" | "efetivo" | "consultoria_produto";
+  type: "tentativa" | "adoption" | "scale" | "health_score" | "consultoria_apoio" | "outros";
   note: string;
   canal: string;
   percepcao?: string | null;
@@ -219,6 +219,13 @@ export default function ClientPage() {
   const [destacado, setDestacado] = useState<string | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [csm, setCsm] = useState<{ full_name: string } | null>(null);
+  const [csmsList, setCsmsList] = useState<{ id: string; full_name: string }[]>([]);
+  const [editandoInfo, setEditandoInfo] = useState(false);
+  const [salvandoInfo, setSalvandoInfo] = useState(false);
+  const [infoForm, setInfoForm] = useState<{
+    csm_id: string; cluster: string; plano: string; operacao: string; rede: string; cidade: string;
+    representante_legal: string; telefone: string; email: string;
+  }>({ csm_id: "", cluster: "", plano: "", operacao: "", rede: "", cidade: "", representante_legal: "", telefone: "", email: "" });
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [audit, setAudit] = useState<AuditLog[]>([]);
   const [observacoes, setObservacoes] = useState("");
@@ -235,7 +242,7 @@ export default function ClientPage() {
   const [centralExpandida, setCentralExpandida] = useState<string | null>(null);
   const [healthCarregando, setHealthCarregando] = useState(true);
   const [auditLimit, setAuditLimit] = useState(10);
-  const [form, setForm] = useState<{ type: string; date: string; note: string; canal: string; percepcao: Percepcao }>({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null });
+  const [form, setForm] = useState<{ type: string; date: string; note: string; canal: string; percepcao: Percepcao }>({ type: "adoption", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null });
   const [showTentativaModal, setShowTentativaModal] = useState(false);
   const [tentativaForm, setTentativaForm] = useState<{ date: string; canal: string; note: string; percepcao: Percepcao }>({ date: new Date().toISOString().split("T")[0], canal: "whatsapp", note: "", percepcao: null });
   const [savingTentativa, setSavingTentativa] = useState(false);
@@ -375,6 +382,13 @@ export default function ClientPage() {
         setCsm(profile);
       }
 
+      // Lista de todos os CSMs (para o dropdown de reatribuição)
+      const { data: todosCsms } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .order("full_name");
+      if (todosCsms) setCsmsList(todosCsms as { id: string; full_name: string }[]);
+
       await loadContacts();
       await loadAudit();
       setLoading(false);
@@ -434,6 +448,56 @@ export default function ClientPage() {
     setSavingObservacoes(false);
   }
 
+  function abrirEdicaoInfo() {
+    if (!client) return;
+    setInfoForm({
+      csm_id: client.csm_id ?? "",
+      cluster: client.cluster ?? "",
+      plano: client.plano ?? "",
+      operacao: client.operacao ?? "",
+      rede: client.rede ?? "",
+      cidade: client.cidade ?? "",
+      representante_legal: client.representante_legal ?? "",
+      telefone: client.telefone ?? "",
+      email: client.email ?? "",
+    });
+    setEditandoInfo(true);
+  }
+
+  async function handleSaveInfo() {
+    if (!client) return;
+    setSalvandoInfo(true);
+
+    const updateObj = {
+      csm_id: infoForm.csm_id || null,
+      cluster: infoForm.cluster || null,
+      plano: infoForm.plano || null,
+      operacao: infoForm.operacao || null,
+      rede: infoForm.rede || null,
+      cidade: infoForm.cidade || null,
+      representante_legal: infoForm.representante_legal || null,
+      telefone: infoForm.telefone || null,
+      email: infoForm.email || null,
+    };
+    const { error } = await supabase.from("clients").update(updateObj).eq("id", id);
+
+    if (!error) {
+      // registra no histórico as mudanças relevantes
+      if ((client.csm_id ?? "") !== infoForm.csm_id) {
+        const nomeAntigo = csm?.full_name ?? "(sem CSM)";
+        const nomeNovo = csmsList.find(c => c.id === infoForm.csm_id)?.full_name ?? "(sem CSM)";
+        await logAudit("editou", "Cliente", "CSM Responsável", nomeAntigo, nomeNovo);
+        setCsm(nomeNovo === "(sem CSM)" ? null : { full_name: nomeNovo });
+      }
+      if ((client.cluster ?? "") !== infoForm.cluster) await logAudit("editou", "Cliente", "Cluster", client.cluster ?? "(vazio)", infoForm.cluster || "(vazio)");
+      // atualiza o estado local do cliente
+      setClient({ ...client, ...updateObj, operacao: infoForm.operacao });
+      await loadAudit();
+      setEditandoInfo(false);
+    }
+    setSalvandoInfo(false);
+  }
+
   async function handleSaveContact() {
     if (noteIsEmpty(form.note)) return;
     setSaving(true);
@@ -472,9 +536,15 @@ export default function ClientPage() {
       });
 
       const typeLabels: Record<string, string> = {
-        efetivo: "Contato",
+        adoption: "Adoption",
+        scale: "Scale",
+        health_score: "Health Score",
+        consultoria_apoio: "Consultoria/Apoio",
         tentativa: "Tentativa de contato",
-        consultoria_produto: "Consultoria de Produto",
+        outros: "Outros",
+        // fallback para dados antigos não migrados
+        efetivo: "Outros",
+        consultoria_produto: "Consultoria/Apoio",
       };
 
       await logAudit("registrou", "Contato", "Tipo", undefined, typeLabels[form.type]);
@@ -492,7 +562,7 @@ export default function ClientPage() {
 
     await loadContacts();
     await loadAudit();
-    setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null });
+    setForm({ type: "adoption", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null });
     setEditingContact(null);
     setShowModal(false);
     setSaving(false);
@@ -526,13 +596,25 @@ export default function ClientPage() {
 
   const typeLabel: Record<string, string> = {
     tentativa: "Tentativa de contato",
-    efetivo: "Contato",
-    consultoria_produto: "Consultoria de Produto",
+    adoption: "Adoption",
+    scale: "Scale",
+    health_score: "Health Score",
+    consultoria_apoio: "Consultoria/Apoio",
+    outros: "Outros",
+    // fallback para dados antigos não migrados
+    efetivo: "Outros",
+    consultoria_produto: "Consultoria/Apoio",
   };
 
   const typeColor: Record<string, string> = {
     tentativa: "bg-red-100 text-red-700",
-    efetivo: "bg-green-100 text-green-700",
+    adoption: "bg-blue-100 text-blue-700",
+    scale: "bg-indigo-100 text-indigo-700",
+    health_score: "bg-emerald-100 text-emerald-700",
+    consultoria_apoio: "bg-purple-100 text-purple-700",
+    outros: "bg-slate-100 text-slate-700",
+    // fallback para dados antigos não migrados
+    efetivo: "bg-slate-100 text-slate-700",
     consultoria_produto: "bg-purple-100 text-purple-700",
   };
 
@@ -544,21 +626,27 @@ export default function ClientPage() {
   };
 
   const clusterLabel: Record<string, string> = {
-    high_touch: "High Touch",
-    mid_touch: "Mid Touch",
-    growth_touch: "Growth Touch",
-    no_touch: "No Touch",
+    A: "A",
+    B: "B",
+    C: "C",
+    D: "D",
   };
 
   const operacaoColor: Record<string, string> = {
-    corridas: "bg-blue-100 text-blue-700",
-    entregas: "bg-orange-100 text-orange-700",
+    Corridas: "bg-blue-100 text-blue-700",
+    Entregas: "bg-orange-100 text-orange-700",
+    Mototáxi: "bg-purple-100 text-purple-700",
+    Táxi: "bg-emerald-100 text-emerald-700",
   };
 
   const planoColor: Record<string, string> = {
-    start: "bg-gray-100 text-gray-600",
-    growth: "bg-blue-100 text-blue-700",
-    master: "bg-purple-100 text-purple-700",
+    Start: "bg-gray-100 text-gray-600",
+    Essencial: "bg-slate-100 text-slate-700",
+    Growth: "bg-blue-100 text-blue-700",
+    Super: "bg-cyan-100 text-cyan-700",
+    Top: "bg-amber-100 text-amber-700",
+    Ouro: "bg-yellow-100 text-yellow-700",
+    Master: "bg-purple-100 text-purple-700",
   };
 
   if (loading) return (
@@ -592,13 +680,20 @@ export default function ClientPage() {
               <div className="flex items-center gap-3 flex-wrap">
                 <h2 className="text-2xl font-semibold text-gray-900">{client.marca}</h2>
                 {client.operacao && (
-                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${operacaoColor[client.operacao]}`}>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${operacaoColor[client.operacao] ?? "bg-gray-100 text-gray-600"}`}>
                     {client.operacao}
                   </span>
                 )}
                 {client.plano && (
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${planoColor[client.plano] ?? "bg-gray-100 text-gray-600"}`}>
                     {client.plano.charAt(0).toUpperCase() + client.plano.slice(1)}
+                  </span>
+                )}
+                {client.carteira && (
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    client.carteira === "Carteirizado" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                  }`}>
+                    {client.carteira}
                   </span>
                 )}
                 {percepcaoAtual && (
@@ -619,47 +714,151 @@ export default function ClientPage() {
 
         {/* Informações */}
         <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
-          <h3 className="font-medium text-gray-900 mb-4">Informações</h3>
-          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">CSM Responsável</dt>
-              <dd className="text-sm font-medium text-gray-900">{csm?.full_name ?? "—"}</dd>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium text-gray-900">Informações</h3>
+            {!editandoInfo ? (
+              <button onClick={abrirEdicaoInfo} className="text-xs text-blue-600 hover:text-blue-700 font-medium">Editar</button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button onClick={() => setEditandoInfo(false)} disabled={salvandoInfo} className="text-xs text-gray-500 hover:text-gray-700">Cancelar</button>
+                <button onClick={handleSaveInfo} disabled={salvandoInfo} className="text-xs bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 disabled:opacity-50">{salvandoInfo ? "Salvando..." : "Salvar"}</button>
+              </div>
+            )}
+          </div>
+
+          {!editandoInfo ? (
+            <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <div>
+                <dt className="text-xs text-gray-400 mb-1">CSM Responsável</dt>
+                <dd className="text-sm font-medium text-gray-900">{csm?.full_name ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 mb-1">Cluster</dt>
+                <dd className="text-sm font-medium text-gray-900">{client.cluster ? clusterLabel[client.cluster] ?? client.cluster : "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 mb-1">Plano</dt>
+                <dd className="text-sm font-medium text-gray-900">{client.plano ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 mb-1">Operação</dt>
+                <dd className="text-sm font-medium text-gray-900">{client.operacao ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 mb-1">Rede</dt>
+                <dd className="text-sm font-medium text-gray-900">{client.rede ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 mb-1">Cidade</dt>
+                <dd className="text-sm font-medium text-gray-900">{client.cidade ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 mb-1">Health Score</dt>
+                <dd className="text-sm font-medium">
+                  {healthScore && healthScore.score !== null ? (
+                    <span style={{ color: healthScore.banda === "Verde" ? "#16a34a" : healthScore.banda === "Amarelo" ? "#f59e0b" : healthScore.banda === "Vermelho" ? "#dc2626" : "#64748b" }}>
+                      {Math.round(healthScore.score)}
+                      <span className="text-gray-400 font-normal"> · {healthScore.banda === "Verde" ? "Saudável" : healthScore.banda === "Amarelo" ? "Em risco" : healthScore.banda === "Vermelho" ? "Crítico" : healthScore.banda}</span>
+                    </span>
+                  ) : (
+                    <span className="text-gray-900">—</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 mb-1">Último contato</dt>
+                <dd className="text-sm font-medium text-gray-900">
+                  {client.last_contact ? new Date(client.last_contact).toLocaleDateString("pt-BR") : "—"}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">CSM Responsável</label>
+                <select value={infoForm.csm_id} onChange={e => setInfoForm({ ...infoForm, csm_id: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">— Sem CSM —</option>
+                  {csmsList.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Cluster</label>
+                <select value={infoForm.cluster} onChange={e => setInfoForm({ ...infoForm, cluster: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">—</option>
+                  {["A", "B", "C", "D"].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Plano</label>
+                <select value={infoForm.plano} onChange={e => setInfoForm({ ...infoForm, plano: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">—</option>
+                  {["Start", "Essencial", "Growth", "Super", "Top", "Ouro", "Master"].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Operação</label>
+                <select value={infoForm.operacao} onChange={e => setInfoForm({ ...infoForm, operacao: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">—</option>
+                  {["Corridas", "Entregas", "Mototáxi", "Táxi"].map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Rede</label>
+                <input value={infoForm.rede} onChange={e => setInfoForm({ ...infoForm, rede: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Cidade</label>
+                <input value={infoForm.cidade} onChange={e => setInfoForm({ ...infoForm, cidade: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
             </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Cluster</dt>
-              <dd className="text-sm font-medium text-gray-900">{client.cluster ? clusterLabel[client.cluster] : "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Plano</dt>
-              <dd className="text-sm font-medium text-gray-900">{client.plano ? client.plano.charAt(0).toUpperCase() + client.plano.slice(1) : "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Operação</dt>
-              <dd className="text-sm font-medium text-gray-900">{client.operacao ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Health Score</dt>
-              <dd className="text-sm font-medium">
-                {healthScore && healthScore.score !== null ? (
-                  <span style={{ color: healthScore.banda === "Verde" ? "#16a34a" : healthScore.banda === "Amarelo" ? "#f59e0b" : healthScore.banda === "Vermelho" ? "#dc2626" : "#64748b" }}>
-                    {Math.round(healthScore.score)}
-                    <span className="text-gray-400 font-normal"> · {healthScore.banda === "Verde" ? "Saudável" : healthScore.banda === "Amarelo" ? "Em risco" : healthScore.banda === "Vermelho" ? "Crítico" : healthScore.banda}</span>
-                  </span>
-                ) : (
-                  <span className="text-gray-900">—</span>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400 mb-1">Último contato</dt>
-              <dd className="text-sm font-medium text-gray-900">
-                {client.last_contact ? new Date(client.last_contact).toLocaleDateString("pt-BR") : "—"}
-              </dd>
-            </div>
-          </dl>
+          )}
         </div>
 
-        {/* Tabs */}
+        {/* Contato */}
+        {(editandoInfo || client.representante_legal || client.telefone || client.email) && (
+          <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
+            <h3 className="font-medium text-gray-900 mb-4">Contato</h3>
+            {!editandoInfo ? (
+              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-gray-400 mb-1">Representante legal</dt>
+                  <dd className="text-sm font-medium text-gray-900">{client.representante_legal ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-400 mb-1">Telefone</dt>
+                  <dd className="text-sm font-medium text-gray-900">
+                    {client.telefone ? (
+                      <a href={`tel:${client.telefone}`} className="text-blue-600 hover:underline">{client.telefone}</a>
+                    ) : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-400 mb-1">E-mail</dt>
+                  <dd className="text-sm font-medium text-gray-900 break-all">
+                    {client.email ? (
+                      <a href={`mailto:${client.email}`} className="text-blue-600 hover:underline">{client.email}</a>
+                    ) : "—"}
+                  </dd>
+                </div>
+              </dl>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Representante legal</label>
+                  <input value={infoForm.representante_legal} onChange={e => setInfoForm({ ...infoForm, representante_legal: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Telefone</label>
+                  <input value={infoForm.telefone} onChange={e => setInfoForm({ ...infoForm, telefone: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">E-mail</label>
+                  <input value={infoForm.email} onChange={e => setInfoForm({ ...infoForm, email: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="flex border-b border-slate-200/60">
             <button onClick={() => setActiveTab("contatos")} className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === "contatos" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
@@ -692,7 +891,7 @@ export default function ClientPage() {
                       Registrar tentativa de contato
                     </button>
                     <button
-                      onClick={() => { setEditingContact(null); setForm({ type: "efetivo", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null }); setShowModal(true); }}
+                      onClick={() => { setEditingContact(null); setForm({ type: "adoption", date: new Date().toISOString().split("T")[0], note: "", canal: "whatsapp", percepcao: null }); setShowModal(true); }}
                       className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       + Registrar contato
@@ -1002,8 +1201,11 @@ export default function ClientPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
                 <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="efetivo">Contato</option>
-                  <option value="consultoria_produto">Consultoria de Produto</option>
+                  <option value="adoption">Adoption</option>
+                  <option value="scale">Scale</option>
+                  <option value="health_score">Health Score</option>
+                  <option value="consultoria_apoio">Consultoria/Apoio</option>
+                  <option value="outros">Outros</option>
                 </select>
               </div>
               <div>

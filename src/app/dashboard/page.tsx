@@ -7,6 +7,7 @@ import type { Profile, Client } from "@/lib/types";
 import { useRouter, useSearchParams } from "next/navigation";
 import SaudeCarteira from "@/components/SaudeCarteira";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
+import BuscaClientes from "@/components/BuscaClientes";
 import { FilaPriorizacao } from "@/components/FilaPriorizacao";
 import MenuLateral from "@/components/MenuLateral";
 
@@ -70,14 +71,25 @@ function DashboardInner() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push("/login"); return; }
 
+    // Papéis do usuário logado
+    const { data: rolesUser } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+    const listaRoles = (rolesUser ?? []).map((r: { role: string }) => r.role);
+    const ehCsm = listaRoles.some(r => r === "csm" || r === "csm_admin");
+    const ehAdmin = listaRoles.some(r => r === "admin" || r === "csm_admin");
+
+    // Quem é SÓ admin (sem carteira) não deve ver o dashboard da própria carteira:
+    // ao acessar sem ?csm=, é levado ao Painel de Gestão.
+    if (!csmParam && !ehCsm && ehAdmin) {
+      router.replace("/admin");
+      return;
+    }
+
     // Determina de qual CSM mostrar a carteira:
     // - por padrão, o próprio usuário logado
     // - se veio ?csm=ID na URL E o usuário logado é admin, mostra a carteira daquele CSM
     let targetId = user.id;
     let ehOutro = false;
     if (csmParam && csmParam !== user.id) {
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-      const ehAdmin = (roles ?? []).some((r: { role: string }) => r.role === "admin");
       if (ehAdmin) { targetId = csmParam; ehOutro = true; }
     }
     setViewingOther(ehOutro);
@@ -102,8 +114,8 @@ function DashboardInner() {
     startOfMonth.setDate(1);
     const { data: consultoriasDoMes } = await supabase
       .from("client_contacts")
-      .select("client_id, date, clients!inner(id, marca, bandeira, csm_id)")
-      .eq("type", "consultoria_produto")
+      .select("client_id, date, type, clients!inner(id, marca, bandeira, csm_id)")
+      .neq("type", "tentativa")
       .eq("clients.csm_id", targetId)
       .gte("date", startOfMonth.toISOString().split("T")[0])
       .order("date", { ascending: false });
@@ -128,7 +140,7 @@ function DashboardInner() {
     const { data: consultorias } = await supabase
       .from("client_contacts")
       .select("client_id")
-      .eq("type", "consultoria_produto")
+      .neq("type", "tentativa")
       .gte("date", thirtyDaysAgo.toISOString().split("T")[0]);
 
     const consultSet = new Set((consultorias ?? []).map((c: { client_id: string }) => c.client_id));
@@ -158,7 +170,7 @@ function DashboardInner() {
 
     (clients ?? []).forEach((client: Client) => {
       const contatos = clientContactsMap[client.id] ?? [];
-      const ultimoEfetivo = contatos.find((c: ContatoMin) => c.type === "efetivo" || c.type === "consultoria_produto");
+      const ultimoEfetivo = contatos.find((c: ContatoMin) => c.type !== "tentativa");
       const tentativasApos = ultimoEfetivo
         ? contatos.filter((c: ContatoMin) => c.type === "tentativa" && c.date > ultimoEfetivo.date)
         : contatos.filter((c: ContatoMin) => c.type === "tentativa");
@@ -252,15 +264,17 @@ function DashboardInner() {
     });
 
   const clusterLabel: Record<string, string> = {
-    high_touch: "High Touch",
-    mid_touch: "Mid Touch",
-    growth_touch: "Growth Touch",
-    no_touch: "No Touch",
+    A: "A",
+    B: "B",
+    C: "C",
+    D: "D",
   };
 
   const operacaoColor: Record<string, string> = {
-    corridas: "bg-blue-100 text-blue-700",
-    entregas: "bg-orange-100 text-orange-700",
+    Corridas: "bg-blue-100 text-blue-700",
+    Entregas: "bg-orange-100 text-orange-700",
+    Mototáxi: "bg-purple-100 text-purple-700",
+    Táxi: "bg-emerald-100 text-emerald-700",
   };
 
   // Filtrar e ordenar clientes do modal de follow-up
@@ -352,12 +366,12 @@ function DashboardInner() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Progresso mensal</p>
                   <button
                     onClick={() => setModal({ type: "consultorias" })}
-                    title="Ver com quem você fez consultoria este mês"
+                    title="Ver os contatos que você registrou este mês"
                     className="text-3xl font-bold tabular-nums text-gray-900 mt-1 hover:text-blue-600 transition-colors cursor-pointer"
                   >
                     {contactCount}{temMeta && <span className="text-xl text-gray-300"> / {goal}</span>}
                   </button>
-                  <p className="text-xs text-gray-400">consultorias de produto{temMeta ? ` · ${pct}%` : ""}</p>
+                  <p className="text-xs text-gray-400">contatos no mês{temMeta ? ` · ${pct}%` : ""}</p>
                 </div>
               </div>
               {temMeta ? (
@@ -443,18 +457,20 @@ function DashboardInner() {
                     <label className="block text-xs font-medium text-gray-500 mb-1">Operação</label>
                     <select value={rascunho.operacao} onChange={e => setRascunho({ ...rascunho, operacao: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                       <option value="">Todas</option>
-                      <option value="corridas">Corridas</option>
-                      <option value="entregas">Entregas</option>
+                      <option value="Corridas">Corridas</option>
+                      <option value="Entregas">Entregas</option>
+                      <option value="Mototáxi">Mototáxi</option>
+                      <option value="Táxi">Táxi</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Cluster</label>
                     <select value={rascunho.cluster} onChange={e => setRascunho({ ...rascunho, cluster: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                       <option value="">Todos</option>
-                      <option value="high_touch">High Touch</option>
-                      <option value="mid_touch">Mid Touch</option>
-                      <option value="growth_touch">Growth Touch</option>
-                      <option value="no_touch">No Touch</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
                     </select>
                   </div>
                   <div>
@@ -534,7 +550,7 @@ function DashboardInner() {
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">
                         Bandeira {c.bandeira}
-                        {c.cluster ? ` · ${clusterLabel[c.cluster]}` : ""}
+                        {c.cluster ? ` · ${clusterLabel[c.cluster] ?? c.cluster}` : ""}
                         {c.plano ? ` · ${c.plano.charAt(0).toUpperCase() + c.plano.slice(1)}` : ""}
                       </p>
                       <div className="flex flex-wrap gap-1.5 mt-1.5">
@@ -545,7 +561,7 @@ function DashboardInner() {
                         )}
                         {consultoriasSet.has(c.id) ? (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
-                            Consultoria de Produto realizada nos últimos 30 dias
+                            Contato realizado nos últimos 30 dias
                           </span>
                         ) : tentativasMap[c.id] > 0 ? (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600">
@@ -583,6 +599,7 @@ function DashboardInner() {
 
         {abaAtiva === "estatisticas" && (
           <div className="space-y-6">
+            <BuscaClientes />
             <DistribuicaoCarteira />
             <SaudeCarteira />
           </div>
@@ -698,15 +715,15 @@ function DashboardInner() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4" onClick={() => setModal(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Consultorias de produto no mês</h3>
+              <h3 className="font-semibold text-gray-900">Contatos no mês</h3>
               <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-400">{consultoriasMes.length} {consultoriasMes.length === 1 ? "consultoria" : "consultorias"}</span>
+                <span className="text-xs text-gray-400">{consultoriasMes.length} {consultoriasMes.length === 1 ? "contato" : "contatos"}</span>
                 <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
               </div>
             </div>
             <ul className="divide-y divide-gray-100 overflow-y-auto flex-1">
               {consultoriasMes.length === 0 ? (
-                <li className="px-6 py-8 text-center text-sm text-gray-400">Nenhuma consultoria de produto registrada este mês.</li>
+                <li className="px-6 py-8 text-center text-sm text-gray-400">Nenhum contato registrado este mês.</li>
               ) : consultoriasMes.map((c, i) => {
                 const cliente = Array.isArray(c.clients) ? c.clients[0] : c.clients;
                 return (

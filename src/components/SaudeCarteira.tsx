@@ -8,17 +8,12 @@ import {
 } from "recharts";
 
 type BandaKey = "Verde" | "Amarelo" | "Vermelho" | "N/A";
-type BandaCount = { banda: string; bandaKey: BandaKey; valor: number; cor: string };
 type RedeScore = {
   rede: string;
   operacao: string;
   score: number | null;
   banda: BandaKey;
-  sub_volume: number | null;
-  sub_queda: number | null;
-  sub_perdidas: number | null;
   codigo_matriz: string | null;
-  client_id: string | null;
 };
 
 const CORES: Record<string, string> = {
@@ -46,15 +41,16 @@ function norm(s: string): string {
 
 export default function SaudeCarteira() {
   const router = useRouter();
-  const [dados, setDados] = useState<BandaCount[]>([]);
   const [redes, setRedes] = useState<RedeScore[]>([]);
-  const [total, setTotal] = useState(0);
   const [ultimo, setUltimo] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [semDados, setSemDados] = useState(false);
   const [filtroBanda, setFiltroBanda] = useState<BandaKey | null>(null);
   const [busca, setBusca] = useState("");
   const [clientesPorNome, setClientesPorNome] = useState<Record<string, string>>({});
+  const [csmPorCodigo, setCsmPorCodigo] = useState<Record<string, string>>({});
+  const [csms, setCsms] = useState<{ id: string; nome: string }[]>([]);
+  const [filtroCsm, setFiltroCsm] = useState<string>("");
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -64,7 +60,7 @@ export default function SaudeCarteira() {
     for (;;) {
       const { data, error } = await supabase
         .from("hs_scores")
-        .select("rede, operacao, score, banda, sub_volume, sub_queda, sub_perdidas, codigo_matriz, client_id, importado_em")
+        .select("rede, operacao, score, banda, codigo_matriz, importado_em")
         .eq("tipo", "rede")
         .order("score", { ascending: true, nullsFirst: false })
         .range(from, from + 999);
@@ -77,36 +73,60 @@ export default function SaudeCarteira() {
       from += 1000;
     }
 
+    // Matrizes não-avaliadas (banda N/A) entram como "redes sem nota"
+    let fromNA = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from("hs_scores")
+        .select("rede, operacao, score, banda, codigo, importado_em")
+        .eq("tipo", "central").eq("banda", "N/A").eq("tipo_central", "Matriz")
+        .range(fromNA, fromNA + 999);
+      if (error || !data || data.length === 0) break;
+      for (const row of data as (RedeScore & { codigo: string | null; importado_em: string })[]) {
+        linhas.push({ rede: row.rede, operacao: row.operacao, score: null, banda: "N/A", codigo_matriz: row.codigo });
+        if (row.importado_em > maisRecente) maisRecente = row.importado_em;
+      }
+      if (data.length < 1000) break;
+      fromNA += 1000;
+    }
+
     if (linhas.length === 0) { setSemDados(true); setCarregando(false); return; }
 
     // Carrega clientes para casar rede -> cliente pelo CÓDIGO (clients.bandeira = codigo_matriz)
     const mapaClientes: Record<string, string> = {};
     let cf = 0;
+    const mapaCsmCodigo: Record<string, string> = {};
     for (;;) {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, bandeira")
+        .select("id, bandeira, csm_id")
         .range(cf, cf + 999);
       if (error || !data || data.length === 0) break;
-      for (const c of data as { id: string; bandeira: string | null }[]) {
+      for (const c of data as { id: string; bandeira: string | null; csm_id: string | null }[]) {
         const chave = (c.bandeira ?? "").trim();
         if (chave && !mapaClientes[chave]) mapaClientes[chave] = c.id;
+        if (chave && c.csm_id) mapaCsmCodigo[chave] = c.csm_id;
       }
       if (data.length < 1000) break;
       cf += 1000;
     }
     setClientesPorNome(mapaClientes);
+    setCsmPorCodigo(mapaCsmCodigo);
 
-    const cont: Record<string, number> = { Verde: 0, Amarelo: 0, Vermelho: 0, "N/A": 0 };
-    linhas.forEach(r => { if (r.banda in cont) cont[r.banda]++; });
+    // Lista de CSMs (para o dropdown)
+    const { data: perfis } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .order("full_name");
+    if (perfis) {
+      // só CSMs que têm ao menos um cliente casado com o HS
+      const idsComCarteira = new Set(Object.values(mapaCsmCodigo));
+      setCsms((perfis as { id: string; full_name: string }[])
+        .filter(p => idsComCarteira.has(p.id))
+        .map(p => ({ id: p.id, nome: p.full_name })));
+    }
 
-    const arr: BandaCount[] = (["Verde", "Amarelo", "Vermelho", "N/A"] as const)
-      .filter(b => cont[b] > 0)
-      .map(b => ({ banda: ROTULO[b], bandaKey: b, valor: cont[b], cor: CORES[b] }));
-
-    setDados(arr);
     setRedes(linhas);
-    setTotal(linhas.length);
     setUltimo(maisRecente || null);
     setSemDados(false);
     setCarregando(false);
@@ -118,14 +138,32 @@ export default function SaudeCarteira() {
     carregar();
   }, [carregar]);
 
+  // Base: redes do CSM selecionado (ou todas). Casa a matriz da rede -> csm_id do cliente
+  const redesDoCsm = useMemo(() => {
+    if (!filtroCsm) return redes;
+    return redes.filter(r => {
+      const cod = (r.codigo_matriz ?? "").trim();
+      return cod && csmPorCodigo[cod] === filtroCsm;
+    });
+  }, [redes, filtroCsm, csmPorCodigo]);
+
+  // Donut (contagem por banda) reativo ao filtro de CSM
+  const dadosDonut = useMemo(() => {
+    const cont: Record<string, number> = { Verde: 0, Amarelo: 0, Vermelho: 0, "N/A": 0 };
+    redesDoCsm.forEach(r => { if (r.banda in cont) cont[r.banda]++; });
+    return (["Verde", "Amarelo", "Vermelho", "N/A"] as const)
+      .filter(b => cont[b] > 0)
+      .map(b => ({ banda: ROTULO[b], bandaKey: b, valor: cont[b], cor: CORES[b] }));
+  }, [redesDoCsm]);
+
   const redesFiltradas = useMemo(() => {
     const termo = norm(busca.trim());
-    return redes.filter(r => {
+    return redesDoCsm.filter(r => {
       if (filtroBanda && r.banda !== filtroBanda) return false;
       if (termo && !norm(r.rede).includes(termo)) return false;
       return true;
     });
-  }, [redes, filtroBanda, busca]);
+  }, [redesDoCsm, filtroBanda, busca]);
 
   return (
     <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
@@ -137,6 +175,18 @@ export default function SaudeCarteira() {
             {ultimo ? ` · atualizado em ${new Date(ultimo).toLocaleDateString("pt-BR")}` : ""}
           </p>
         </div>
+        {csms.length > 0 && (
+          <select
+            value={filtroCsm}
+            onChange={e => { setFiltroCsm(e.target.value); setFiltroBanda(null); }}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Todos os CSMs</option>
+            {csms.map(c => (
+              <option key={c.id} value={c.id}>{c.nome}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {carregando ? (
@@ -152,7 +202,7 @@ export default function SaudeCarteira() {
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie
-                  data={dados}
+                  data={dadosDonut}
                   dataKey="valor"
                   nameKey="banda"
                   cx="50%"
@@ -161,12 +211,12 @@ export default function SaudeCarteira() {
                   outerRadius={90}
                   paddingAngle={2}
                   onClick={(_, index) => {
-                    const b = dados[index]?.bandaKey;
+                    const b = dadosDonut[index]?.bandaKey;
                     if (b) setFiltroBanda(prev => (prev === b ? null : b));
                   }}
                   style={{ cursor: "pointer" }}
                 >
-                  {dados.map((d, i) => (
+                  {dadosDonut.map((d, i) => (
                     <Cell key={i} fill={d.cor} opacity={filtroBanda && filtroBanda !== d.bandaKey ? 0.35 : 1} />
                   ))}
                 </Pie>
@@ -175,7 +225,7 @@ export default function SaudeCarteira() {
               </PieChart>
             </ResponsiveContainer>
             <div className="text-center shrink-0 sm:pr-6">
-              <p className="text-3xl font-semibold text-gray-900">{total}</p>
+              <p className="text-3xl font-semibold text-gray-900">{redesDoCsm.length}</p>
               <p className="text-xs text-gray-400">redes avaliadas</p>
             </div>
           </div>
@@ -189,7 +239,7 @@ export default function SaudeCarteira() {
               >
                 Todas
               </button>
-              {(["Verde", "Amarelo", "Vermelho", "N/A"] as const).map(b => (
+              {dadosDonut.map(d => d.bandaKey).map(b => (
                 <button
                   key={b}
                   onClick={() => setFiltroBanda(prev => (prev === b ? null : b))}
@@ -220,7 +270,7 @@ export default function SaudeCarteira() {
                 <li className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma rede encontrada.</li>
               ) : redesFiltradas.map((r, i) => {
                 const cor = CORES[r.banda];
-                const clientId = r.client_id ?? (r.codigo_matriz ? clientesPorNome[String(r.codigo_matriz).trim()] : null) ?? null;
+                const clientId = r.codigo_matriz ? clientesPorNome[String(r.codigo_matriz).trim()] ?? null : null;
                 const clicavel = !!clientId;
                 return (
                   <li key={`${r.rede}-${r.operacao}-${i}`}>

@@ -22,9 +22,15 @@ export const PRESETS: { id: Preset; label: string }[] = [
 ];
 
 export const TIPOS_CONHECIDOS: Record<string, { nome: string; cor: string }> = {
-  consultoria_produto: { nome: "Consultoria", cor: "#2563eb" },
-  efetivo: { nome: "Efetivo", cor: "#16a34a" },
+  adoption: { nome: "Adoption", cor: "#2563eb" },
+  scale: { nome: "Scale", cor: "#6366f1" },
+  health_score: { nome: "Health Score", cor: "#10b981" },
+  consultoria_apoio: { nome: "Consultoria/Apoio", cor: "#a855f7" },
   tentativa: { nome: "Tentativa", cor: "#64748b" },
+  outros: { nome: "Outros", cor: "#94a3b8" },
+  // fallback para dados antigos não migrados
+  consultoria_produto: { nome: "Consultoria/Apoio", cor: "#a855f7" },
+  efetivo: { nome: "Outros", cor: "#94a3b8" },
 };
 export const COR_TOTAL = "#f59e0b";
 export const PALETA_AUTO = ["#a855f7", "#ec4899", "#14b8a6", "#f97316", "#0ea5e9", "#84cc16", "#eab308"];

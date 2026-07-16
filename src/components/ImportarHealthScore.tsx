@@ -52,6 +52,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
   const [arquivo, setArquivo] = useState<string>("");
   const [redes, setRedes] = useState<LinhaHS[]>([]);
   const [centrais, setCentrais] = useState<LinhaHS[]>([]);
+  const [naoAvaliadas, setNaoAvaliadas] = useState<LinhaHS[]>([]);
   const [erro, setErro] = useState<string>("");
   const [gravando, setGravando] = useState(false);
   const [progresso, setProgresso] = useState("");
@@ -60,7 +61,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setErro(""); setConcluido(false); setRedes([]); setCentrais([]);
+    setErro(""); setConcluido(false); setRedes([]); setCentrais([]); setNaoAvaliadas([]);
     setArquivo(file.name);
 
     try {
@@ -90,6 +91,17 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
 
       setRedes(objRede);
       setCentrais(objCen);
+
+      // aba "Não avaliadas" (opcional) — centrais sem dados na janela
+      const nomeNA = wb.SheetNames.find(n => /avaliad/i.test(n));
+      if (nomeNA) {
+        const mNA = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[nomeNA], { header: 1, defval: null });
+        const hNA = acharHeader(mNA, "Cód.");
+        if (hNA >= 0) {
+          const objNA = abaParaObjetos(mNA, hNA).filter(r => txt(r["Cód."]) !== null);
+          setNaoAvaliadas(objNA);
+        }
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setErro(`Não consegui ler o arquivo: ${msg}`);
@@ -144,6 +156,21 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
       parcial: false,
     }));
 
+    // Não-avaliadas: entram como central, banda N/A, sem sub-notas
+    const linhasNA = naoAvaliadas.map(r => ({
+      tipo: "central",
+      codigo: txt(r["Cód."]),
+      nome: txt(r["Nome"]),
+      rede: txt(r["Rede"]),
+      operacao: txt(r["Operação"]) ?? txt(r["Operacao"]),
+      plano: txt(r["Plano"]),
+      banda: "N/A",
+      score: null,
+      tipo_central: txt(r["Tipo"]),
+      status: txt(r["Status"]),
+      parcial: false,
+    }));
+
     try {
       // 1) limpa a base antiga
       setProgresso("Limpando base anterior...");
@@ -151,7 +178,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
       if (delErr) throw delErr;
 
       // 2) grava em lotes
-      const todas = [...linhasRede, ...linhasCen];
+      const todas = [...linhasRede, ...linhasCen, ...linhasNA];
       const LOTE = 500;
       for (let i = 0; i < todas.length; i += LOTE) {
         const lote = todas.slice(i, i + LOTE);
@@ -174,7 +201,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
   }
 
   function cancelar() {
-    setArquivo(""); setRedes([]); setCentrais([]); setErro(""); setConcluido(false);
+    setArquivo(""); setRedes([]); setCentrais([]); setNaoAvaliadas([]); setErro(""); setConcluido(false);
   }
 
   // ---------- render ----------
@@ -185,7 +212,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
           <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
         </div>
         <p className="text-sm font-medium text-gray-900 dark:text-gray-900">Dados importados com sucesso!</p>
-        <p className="text-xs text-gray-500 mt-1">{redes.length} redes e {centrais.length} centrais gravadas.</p>
+        <p className="text-xs text-gray-500 mt-1">{redes.length} redes e {centrais.length + naoAvaliadas.length} centrais gravadas{naoAvaliadas.length > 0 ? ` (${naoAvaliadas.length} sem nota)` : ""}.</p>
         <button onClick={cancelar} className="mt-4 text-sm px-4 py-2 rounded-lg border border-slate-300 text-gray-600 hover:bg-slate-100 bg-white">
           Importar outro arquivo
         </button>
@@ -209,7 +236,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
           <div className="flex items-center justify-between mb-3">
             <div>
               <p className="text-sm font-medium text-gray-900">{arquivo}</p>
-              <p className="text-xs text-gray-500">{redes.length} redes · {centrais.length} centrais encontradas</p>
+              <p className="text-xs text-gray-500">{redes.length} redes · {centrais.length} centrais{naoAvaliadas.length > 0 ? ` · ${naoAvaliadas.length} sem nota` : ""}</p>
             </div>
             <button onClick={cancelar} className="text-xs text-gray-400 hover:text-gray-600">trocar arquivo</button>
           </div>
@@ -241,7 +268,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
           {erro && <p className="text-xs text-red-500 mb-3">{erro}</p>}
 
           <button onClick={gravar} disabled={gravando} className="w-full rounded-lg bg-blue-600 text-white px-4 py-2.5 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-            {gravando ? (progresso || "Gravando...") : `Importar ${redes.length + centrais.length} registros`}
+            {gravando ? (progresso || "Gravando...") : `Importar ${redes.length + centrais.length + naoAvaliadas.length} registros`}
           </button>
         </div>
       )}

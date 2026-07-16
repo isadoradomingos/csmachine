@@ -1,14 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-const OPERACOES = ["corridas", "entregas"];
-const CLUSTERS = ["high_touch", "mid_touch", "growth_touch", "no_touch"];
-const PLANOS = ["start", "growth", "master"];
-const REQUIRED_FIELDS = ["bandeira", "marca", "operacao", "csm"];
+const REQUIRED_FIELDS = ["bandeira", "marca", "csm"];
 
 type ImportRow = {
   bandeira: string;
@@ -17,6 +15,17 @@ type ImportRow = {
   cluster?: string;
   plano?: string;
   csm?: string;
+  status?: string;
+  // campos novos
+  rede?: string;
+  cidade?: string;
+  carteira?: string;         // Carteirizado | Reativo
+  tipo_central?: string;
+  iniciou_operacao?: string;
+  alcancou_marco?: string;
+  representante_legal?: string;
+  telefone?: string;
+  email?: string;
   // Resultado da análise (prévia, antes de gravar)
   acao?: "adicionar" | "atualizar" | "ignorar";
   motivo?: string;
@@ -53,42 +62,90 @@ export default function ImportarPage() {
   const [buscaPrevia, setBuscaPrevia] = useState("");
   const [buscaAusentes, setBuscaAusentes] = useState("");
   const [erroArquivo, setErroArquivo] = useState("");
+  const [progresso, setProgresso] = useState("");
 
   function diasSince(date: string | null): number {
     if (!date) return 9999;
     return Math.floor((Date.now() - new Date(date).getTime()) / 86400000);
   }
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function mapCarteira(v: string): string | undefined {
+    const s = (v ?? "").trim().toUpperCase();
+    if (s === "SIM") return "Carteirizado";
+    if (s === "REATIVO") return "Reativo";
+    return undefined;
+  }
+
+  // Localiza a linha do cabeçalho procurando "Código"
+  function acharHeader(matriz: unknown[][]): number {
+    for (let i = 0; i < Math.min(8, matriz.length); i++) {
+      const linha = matriz[i].map(c => String(c ?? "").trim().toLowerCase());
+      if (linha.some(c => c === "código" || c === "codigo")) return i;
+    }
+    return -1;
+  }
+
+  function txt(v: unknown): string {
+    if (v === null || v === undefined) return "";
+    const s = String(v).trim();
+    return s === "nan" || s === "#ERROR!" ? "" : s;
+  }
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    file.text().then(text => {
-      const lines = text.trim().split("\n");
-      const headers = lines[0].split(",").map((h: string) => h.trim().toLowerCase());
 
-      // Valida o cabeçalho: a planilha de carteira precisa ter as colunas obrigatórias.
-      // Isso evita subir o arquivo errado (ex: um export do Pipefy) nesta tela.
-      const faltando = REQUIRED_FIELDS.filter(c => !headers.includes(c));
-      if (faltando.length > 0) {
-        setRows([]);
-        setAnalisado(false);
-        setConcluido(false);
-        setAusentes([]);
-        setErroArquivo(
-          `Este arquivo não parece ser uma planilha de carteira. Faltam as colunas: ${faltando.join(", ")}. ` +
-          `O cabeçalho deve conter: ${REQUIRED_FIELDS.join(", ")} (e opcionalmente cluster, plano).`
-        );
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+
+      // Procura a aba "DIVISÃO" (a base de clientes); senão usa a primeira com "Código"
+      const nomeAba = wb.SheetNames.find(n => /divis/i.test(n)) ?? wb.SheetNames[0];
+      const matriz = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[nomeAba], { header: 1, defval: null });
+
+      const h = acharHeader(matriz);
+      if (h < 0) {
+        setRows([]); setAnalisado(false); setConcluido(false); setAusentes([]);
+        setErroArquivo(`Não encontrei a coluna "Código" na planilha. Confira se é a base de clientes (aba DIVISÃO).`);
         setFileKey(k => k + 1);
         return;
       }
 
-      setErroArquivo("");
-      const parsed: ImportRow[] = lines.slice(1).map((line: string) => {
-        const values = line.split(",").map((v: string) => v.trim());
-        const obj: Record<string, string> = {};
-        headers.forEach((h: string, i: number) => { obj[h] = values[i] ?? ""; });
-        return obj as unknown as ImportRow;
-      }).filter((r: ImportRow) => r.bandeira);
+      const headers = matriz[h].map(c => String(c ?? "").trim());
+      const col = (nome: string) => headers.findIndex(x => x.toLowerCase() === nome.toLowerCase());
+      const idx = {
+        codigo: col("Código"), central: col("Central"), responsavel: col("Responsável"),
+        servico: col("Serviço"), plano: col("Plano"), status: col("Status"), abcd: col("ABCD"),
+        rede: col("Rede"), cidade: col("Cidade registrada"), carteira: col("Carteira?"),
+        tipo: col("Tipo de central"), iniciou: col("Iniciou a operação?"), marco: col("Alcançou o marco?"),
+        rep: col("Nome Representante Legal"), tel: col("Telefone"), email: col("E-mail"),
+      };
+
+      const parsed: ImportRow[] = [];
+      for (let i = h + 1; i < matriz.length; i++) {
+        const linha = matriz[i];
+        if (!linha || linha.every(c => c === null || String(c).trim() === "")) continue;
+        const bandeira = txt(linha[idx.codigo]);
+        if (!bandeira) continue;
+        parsed.push({
+          bandeira,
+          marca: txt(linha[idx.central]),
+          csm: txt(linha[idx.responsavel]),
+          operacao: txt(linha[idx.servico]),
+          plano: txt(linha[idx.plano]),
+          status: txt(linha[idx.status]),
+          cluster: txt(linha[idx.abcd]),
+          rede: txt(linha[idx.rede]),
+          cidade: txt(linha[idx.cidade]),
+          carteira: mapCarteira(txt(linha[idx.carteira])),
+          tipo_central: txt(linha[idx.tipo]),
+          iniciou_operacao: txt(linha[idx.iniciou]),
+          alcancou_marco: txt(linha[idx.marco]),
+          representante_legal: txt(linha[idx.rep]),
+          telefone: txt(linha[idx.tel]),
+          email: txt(linha[idx.email]),
+        });
+      }
 
       if (parsed.length === 0) {
         setRows([]);
@@ -97,11 +154,16 @@ export default function ImportarPage() {
         return;
       }
 
+      setErroArquivo("");
       setRows(parsed);
       setAnalisado(false);
       setConcluido(false);
       setAusentes([]);
-    });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setRows([]); setErroArquivo(`Não consegui ler o arquivo: ${msg}`);
+      setFileKey(k => k + 1);
+    }
   }
 
   // Etapa 1: analisar SEM gravar nada
@@ -111,20 +173,51 @@ export default function ImportarPage() {
     const { data: p } = await supabase.from("profiles").select("id, full_name");
     const profs = p ?? [];
 
+    // Casamento tolerante de CSM (planilha -> profile):
+    // 1) match exato normalizado (ignora acento/caixa/espaço)
+    // 2) se não achar, match por PRIMEIRO NOME, mas só quando único (sem ambiguidade)
+    // Resolve casos como "Augusto Silveira" (planilha) vs "Augusto Silva" (banco).
+    const normNome = (s: string) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
+    function acharCsm(nomePlanilha: string): { id: string; full_name: string } | undefined {
+      const alvo = normNome(nomePlanilha);
+      if (!alvo) return undefined;
+      // 1) exato
+      const exato = profs.find(pr => normNome(pr.full_name) === alvo);
+      if (exato) return exato;
+      // 2) primeiro nome único
+      const primeiroAlvo = alvo.split(" ")[0];
+      const candidatos = profs.filter(pr => normNome(pr.full_name).split(" ")[0] === primeiroAlvo);
+      return candidatos.length === 1 ? candidatos[0] : undefined;
+    }
+
     const analisadas: ImportRow[] = [];
     const bandeirasNaPlanilha: string[] = [];
 
-    for (const row of rows) {
-      const { data: existing } = await supabase
+    // Busca TODOS os clientes de uma vez (paginado) e casa em memória.
+    // Evita 1 query por linha da planilha (que travava com mais de mil clientes).
+    const existentesPorBandeira: Record<string, string> = {};
+    let ef = 0;
+    for (;;) {
+      const { data, error } = await supabase
         .from("clients")
-        .select("id")
-        .eq("bandeira", row.bandeira)
-        .maybeSingle();
-      const profile = profs.find((pr) => pr.full_name.toLowerCase() === (row.csm ?? "").toLowerCase());
+        .select("id, bandeira")
+        .range(ef, ef + 999);
+      if (error || !data || data.length === 0) break;
+      for (const c of data as { id: string; bandeira: string | null }[]) {
+        const b = (c.bandeira ?? "").trim();
+        if (b && !existentesPorBandeira[b]) existentesPorBandeira[b] = c.id;
+      }
+      if (data.length < 1000) break;
+      ef += 1000;
+    }
 
-      if (existing) {
+    for (const row of rows) {
+      const existingId = existentesPorBandeira[(row.bandeira ?? "").trim()];
+      const profile = acharCsm(row.csm ?? "");
+
+      if (existingId) {
         bandeirasNaPlanilha.push(row.bandeira);
-        analisadas.push({ ...row, acao: "atualizar", _existingId: existing.id, _csmId: profile?.id ?? null });
+        analisadas.push({ ...row, acao: "atualizar", _existingId: existingId, _csmId: profile?.id ?? null });
       } else {
         const missing = REQUIRED_FIELDS.filter((f: string) => !row[f as keyof ImportRow]);
         if (missing.length > 0 || !profile) {
@@ -182,44 +275,78 @@ export default function ImportarPage() {
     setGravando(true);
     const gravadas: ImportRow[] = [];
 
+    // Monta os objetos de update/insert (sem ir ao banco ainda)
+    const paraAtualizar: { row: ImportRow; obj: Record<string, string> }[] = [];
+    const paraAdicionar: { row: ImportRow; obj: Record<string, string> }[] = [];
+
     for (const row of rows) {
-      try {
-        if (row.acao === "atualizar" && row._existingId) {
-          const updateObj: Record<string, string> = { status: "ativo" };
-          if (row.marca) updateObj.marca = row.marca;
-          if (row.operacao && OPERACOES.includes(row.operacao)) updateObj.operacao = row.operacao;
-          if (row.cluster && CLUSTERS.includes(row.cluster)) updateObj.cluster = row.cluster;
-          if (row.plano && PLANOS.includes(row.plano)) updateObj.plano = row.plano;
-          if (row._csmId) updateObj.csm_id = row._csmId;
-          await supabase.from("clients").update(updateObj).eq("id", row._existingId);
-          gravadas.push({ ...row, resultado: "atualizado" });
-        } else if (row.acao === "adicionar" && row._csmId) {
-          const newClient: Record<string, string> = {
-            marca: row.marca ?? "",
-            bandeira: row.bandeira,
-            operacao: row.operacao ?? "",
-            csm_id: row._csmId,
-            status: "ativo",
-          };
-          if (row.cluster && CLUSTERS.includes(row.cluster)) newClient.cluster = row.cluster;
-          if (row.plano && PLANOS.includes(row.plano)) newClient.plano = row.plano;
-          await supabase.from("clients").insert(newClient);
-          gravadas.push({ ...row, resultado: "adicionado" });
-        } else {
-          gravadas.push({ ...row, resultado: "ignorado", message: row.motivo });
-        }
-      } catch {
-        gravadas.push({ ...row, resultado: "erro", message: "Erro ao processar" });
+      if (row.acao === "atualizar" && row._existingId) {
+        const o: Record<string, string> = { status: "ativo" };
+        if (row.marca) o.marca = row.marca;
+        if (row.operacao) o.operacao = row.operacao;
+        if (row.cluster) o.cluster = row.cluster;
+        if (row.plano) o.plano = row.plano;
+        if (row._csmId) o.csm_id = row._csmId;
+        if (row.rede) o.rede = row.rede;
+        if (row.cidade) o.cidade = row.cidade;
+        if (row.carteira) o.carteira = row.carteira;
+        if (row.tipo_central) o.tipo_central = row.tipo_central;
+        if (row.iniciou_operacao) o.iniciou_operacao = row.iniciou_operacao;
+        if (row.alcancou_marco) o.alcancou_marco = row.alcancou_marco;
+        if (row.representante_legal) o.representante_legal = row.representante_legal;
+        if (row.telefone) o.telefone = row.telefone;
+        if (row.email) o.email = row.email;
+        paraAtualizar.push({ row, obj: o });
+      } else if (row.acao === "adicionar" && row._csmId) {
+        const o: Record<string, string> = {
+          marca: row.marca ?? "", bandeira: row.bandeira, operacao: row.operacao ?? "",
+          csm_id: row._csmId, status: "ativo",
+        };
+        if (row.cluster) o.cluster = row.cluster;
+        if (row.plano) o.plano = row.plano;
+        if (row.rede) o.rede = row.rede;
+        if (row.cidade) o.cidade = row.cidade;
+        if (row.carteira) o.carteira = row.carteira;
+        if (row.tipo_central) o.tipo_central = row.tipo_central;
+        if (row.iniciou_operacao) o.iniciou_operacao = row.iniciou_operacao;
+        if (row.alcancou_marco) o.alcancou_marco = row.alcancou_marco;
+        if (row.representante_legal) o.representante_legal = row.representante_legal;
+        if (row.telefone) o.telefone = row.telefone;
+        if (row.email) o.email = row.email;
+        paraAdicionar.push({ row, obj: o });
+      } else {
+        gravadas.push({ ...row, resultado: "ignorado", message: row.motivo });
       }
+    }
+
+    // Adicionar: inserts em lote (um insert de vários registros por vez)
+    const LOTE = 200;
+    for (let i = 0; i < paraAdicionar.length; i += LOTE) {
+      const grupo = paraAdicionar.slice(i, i + LOTE);
+      setProgresso(`Adicionando ${Math.min(i + LOTE, paraAdicionar.length)} de ${paraAdicionar.length}...`);
+      const { error } = await supabase.from("clients").insert(grupo.map(g => g.obj));
+      grupo.forEach(g => gravadas.push({ ...g.row, resultado: error ? "erro" : "adicionado", message: error?.message }));
+    }
+
+    // Atualizar: em paralelo, em lotes (cada update é individual, mas rodam juntos)
+    for (let i = 0; i < paraAtualizar.length; i += LOTE) {
+      const grupo = paraAtualizar.slice(i, i + LOTE);
+      setProgresso(`Atualizando ${Math.min(i + LOTE, paraAtualizar.length)} de ${paraAtualizar.length}...`);
+      const resultados = await Promise.all(
+        grupo.map(g => supabase.from("clients").update(g.obj).eq("id", g.row._existingId!).then(r => r.error))
+      );
+      grupo.forEach((g, j) => gravadas.push({ ...g.row, resultado: resultados[j] ? "erro" : "atualizado", message: resultados[j]?.message }));
     }
 
     // Inativar os selecionados (em lotes)
     const ids = [...selecionados];
     for (let i = 0; i < ids.length; i += 100) {
+      setProgresso(`Inativando ausentes...`);
       await supabase.from("clients").update({ status: "inativo" }).in("id", ids.slice(i, i + 100));
     }
     setInativadosCount(ids.length);
 
+    setProgresso("");
     setRows(gravadas);
     setGravando(false);
     setConcluido(true);
@@ -312,17 +439,19 @@ export default function ImportarPage() {
           <p className="text-gray-400 text-sm mt-1">Selecione a planilha e clique em Analisar para ver o que será alterado. Nada é gravado até você confirmar.</p>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center justify-between">
-          <div>
-            <p className="font-medium text-blue-900 text-sm">Modelo de planilha</p>
-            <p className="text-xs text-blue-600 mt-0.5">Campos obrigatórios: bandeira, marca, operacao, csm</p>
-          </div>
-          <a href="/modelo_importacao.csv" download className="text-xs bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">↓ Baixar modelo</a>
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+          <p className="font-medium text-blue-900 text-sm">Formato esperado</p>
+          <p className="text-xs text-blue-700 mt-1">
+            Planilha de distribuição (.xlsx) com a aba <span className="font-medium">DIVISÃO</span>, contendo as colunas:
+            Código, Central, Responsável, Serviço, Plano, Status, ABCD, Rede, Tipo de central,
+            Cidade registrada, Carteira?, e os dados de contato (Nome Representante Legal, Telefone, E-mail).
+            O casamento é feito pelo <span className="font-medium">Código</span> (= bandeira do cliente).
+          </p>
         </div>
 
         <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
           <h3 className="font-medium text-gray-900 mb-4">Selecionar arquivo CSV</h3>
-          <input key={fileKey} type="file" accept=".csv" onChange={handleFile} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+          <input key={fileKey} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
           <p className="text-xs text-gray-400 mt-2">Colunas: bandeira*, marca*, operacao*, csm*, cluster, plano</p>
           {erroArquivo && (
             <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
@@ -425,7 +554,7 @@ export default function ImportarPage() {
               <div className="flex items-center gap-2">
                 <button onClick={cancelar} disabled={gravando} className="text-xs text-gray-500 hover:text-gray-700 px-3 py-2 disabled:opacity-50">Cancelar</button>
                 <button onClick={handleConfirmar} disabled={gravando} className="text-xs bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                  {gravando ? "Gravando..." : "Confirmar e aplicar"}
+                  {gravando ? (progresso || "Gravando...") : "Confirmar e aplicar"}
                 </button>
               </div>
             </div>

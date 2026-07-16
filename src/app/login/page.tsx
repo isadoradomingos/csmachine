@@ -55,17 +55,20 @@ export default function LoginPage() {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: role } = await supabase
+    const { data: roles } = await supabase
       .from("user_roles")
       .select("role")
-      .eq("user_id", user!.id)
-      .eq("role", "admin")
-      .single();
+      .eq("user_id", user!.id);
 
-    if (role) {
-      router.push("/admin");
-    } else {
+    // Quem tem carteira (é CSM, inclusive CSM+admin) vai para o dashboard.
+    // Quem é SÓ admin (sem carteira) vai direto para o Painel de Gestão.
+    const listaRoles = (roles ?? []).map((r: { role: string }) => r.role);
+    const ehCsm = listaRoles.some(r => r === "csm" || r === "csm_admin");
+
+    if (ehCsm) {
       router.push("/dashboard");
+    } else {
+      router.push("/admin");
     }
   }
 
