@@ -8,6 +8,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SaudeCarteira from "@/components/SaudeCarteira";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
 import BuscaClientes from "@/components/BuscaClientes";
+import ExportarClientes from "@/components/ExportarClientes";
+import { gerarCsvEnvio, baixarCsv } from "@/lib/exportacao";
 import { FilaPriorizacao } from "@/components/FilaPriorizacao";
 import MenuLateral from "@/components/MenuLateral";
 
@@ -33,7 +35,7 @@ function DashboardInner() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [abaAtiva, setAbaAtiva] = useState<"carteira" | "estatisticas">("carteira");
+  const [abaAtiva, setAbaAtiva] = useState<"carteira" | "estatisticas" | "exportar">("carteira");
   const [criticosCount, setCriticosCount] = useState<number | null>(null);
   const [filterOperacao, setFilterOperacao] = useState("");
   const [filterCluster, setFilterCluster] = useState("");
@@ -103,7 +105,7 @@ function DashboardInner() {
 
     const { data: clients } = await supabase
       .from("clients")
-      .select("id, marca, bandeira, operacao, plano, cluster, status, last_contact")
+      .select("id, marca, bandeira, operacao, plano, cluster, status, last_contact, telefone, email, representante_legal")
       .eq("csm_id", targetId)
       .eq("status", "ativo")
       .order("marca")
@@ -333,6 +335,7 @@ function DashboardInner() {
           {([
             { id: "carteira", label: "Minha carteira" },
             { id: "estatisticas", label: "Estatísticas gerais" },
+            { id: "exportar", label: "Exportar" },
           ] as const).map(aba => (
             <button
               key={aba.id}
@@ -605,6 +608,14 @@ function DashboardInner() {
           </div>
         )}
 
+        {abaAtiva === "exportar" && (
+          <ExportarClientes
+            clientes={clients}
+            bandaPorCliente={bandaPorCliente}
+            percepcaoPorCliente={percepcaoPorCliente}
+          />
+        )}
+
         {/* Fila oculta: monta sempre para calcular o nº de críticos do card (sem exibir) */}
         <div className="hidden" aria-hidden="true">
           <FilaPriorizacao clientes={clients} onAbrirCliente={() => {}} onContarCriticos={setCriticosCount} />
@@ -702,7 +713,22 @@ function DashboardInner() {
                 <h3 className="font-semibold text-gray-900">Fila de priorização de contato</h3>
                 <p className="text-xs text-gray-400 mt-0.5">Ordenada por Health Score e sua percepção · os mais urgentes primeiro</p>
               </div>
-              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    const criticos = clients.filter(c => (bandaPorCliente[c.id] ?? "N/A") === "Vermelho" || percepcaoPorCliente[c.id] === "risco");
+                    const { csv, incluidos, semTelefone } = gerarCsvEnvio(criticos);
+                    if (incluidos === 0) { alert("Nenhum cliente crítico com telefone para exportar."); return; }
+                    const data = new Date().toISOString().split("T")[0];
+                    baixarCsv(csv, `exportacao_clientes_criticos_${data}.csv`);
+                    if (semTelefone > 0) alert(`${incluidos} exportados. ${semTelefone} ficaram de fora por não ter telefone.`);
+                  }}
+                  className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 whitespace-nowrap"
+                >
+                  ↓ Exportar críticos
+                </button>
+                <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-lg">×</button>
+              </div>
             </div>
             <div className="px-6 py-4 overflow-y-auto">
               <FilaPriorizacao clientes={clients} onAbrirCliente={(cid) => { setModal(null); router.push(`/clients/${cid}`); }} />
