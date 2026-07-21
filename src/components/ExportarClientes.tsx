@@ -115,6 +115,28 @@ export default function ExportarClientes({
                   Seguir mesmo assim, exportando apenas os {previa.incluidos} {previa.incluidos === 1 ? "cliente" : "clientes"} com telefone.
                 </span>
               </label>
+
+              {/* Lista dos sem telefone — clicável para completar o cadastro */}
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 overflow-hidden">
+                <p className="text-xs font-medium text-amber-800 px-3 py-2 border-b border-amber-200">
+                  Clientes sem telefone (clique para abrir e completar o cadastro)
+                </p>
+                <ul className="max-h-48 overflow-y-auto divide-y divide-amber-100">
+                  {previa.listaSemTelefone.map(c => (
+                    <li key={c.id ?? c.marca}>
+                      <a
+                        href={`/clients/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between px-3 py-2 hover:bg-amber-100/60 transition-colors"
+                      >
+                        <span className="text-xs text-gray-800">{c.marca ?? "(sem nome)"}</span>
+                        <span className="text-xs text-blue-600">abrir ↗</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
         </div>

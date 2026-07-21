@@ -2,6 +2,8 @@
 // Formato exigido: CSV com colunas phone,name,email
 
 export type ClienteExport = {
+  id?: string;
+  marca?: string;
   telefone?: string | null;
   representante_legal?: string | null;
   email?: string | null;
@@ -18,22 +20,25 @@ function csvCampo(v: string): string {
 
 // Gera o conteúdo CSV no formato phone,name,email.
 // Só inclui clientes com telefone (a ferramenta envia por telefone).
-// Retorna { csv, incluidos, semTelefone }.
-export function gerarCsvEnvio(clientes: ClienteExport[]): { csv: string; incluidos: number; semTelefone: number } {
+// Retorna { csv, incluidos, semTelefone, listaSemTelefone }.
+export function gerarCsvEnvio(clientes: ClienteExport[]): {
+  csv: string; incluidos: number; semTelefone: number;
+  listaSemTelefone: { id?: string; marca?: string }[];
+} {
   const linhas: string[] = ["phone,name,email"];
   let incluidos = 0;
-  let semTelefone = 0;
+  const listaSemTelefone: { id?: string; marca?: string }[] = [];
 
   for (const c of clientes) {
     const phone = (c.telefone ?? "").trim();
-    if (!phone) { semTelefone++; continue; }
+    if (!phone) { listaSemTelefone.push({ id: c.id, marca: c.marca }); continue; }
     const name = (c.representante_legal ?? "").trim();
     const email = (c.email ?? "").trim();
     linhas.push(`${csvCampo(phone)},${csvCampo(name)},${csvCampo(email)}`);
     incluidos++;
   }
 
-  return { csv: linhas.join("\n"), incluidos, semTelefone };
+  return { csv: linhas.join("\n"), incluidos, semTelefone: listaSemTelefone.length, listaSemTelefone };
 }
 
 // Dispara o download do CSV no navegador.
