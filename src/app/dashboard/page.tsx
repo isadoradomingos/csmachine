@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import SaudeCarteira from "@/components/SaudeCarteira";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
 import BuscaClientes from "@/components/BuscaClientes";
+import EvolucaoHealthScore from "@/components/EvolucaoHealthScore";
 import ExportarClientes from "@/components/ExportarClientes";
 import { gerarCsvEnvio, baixarCsv } from "@/lib/exportacao";
 import { FilaPriorizacao } from "@/components/FilaPriorizacao";
@@ -604,6 +605,7 @@ function DashboardInner() {
           <div className="space-y-6">
             <BuscaClientes />
             <DistribuicaoCarteira />
+            <EvolucaoHealthScore />
             <SaudeCarteira />
           </div>
         )}

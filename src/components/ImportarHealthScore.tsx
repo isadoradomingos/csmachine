@@ -188,6 +188,31 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
       }
 
       setProgresso("");
+
+      // Salva um snapshot mensal da distribuição por banda (histórico de evolução).
+      // Conta as REDES por banda (mesma base do gráfico de Saúde da carteira).
+      const cont = { Verde: 0, Amarelo: 0, Vermelho: 0, "N/A": 0 };
+      for (const r of linhasRede) {
+        const b = (r.banda ?? "N/A") as keyof typeof cont;
+        if (b in cont) cont[b]++; else cont["N/A"]++;
+      }
+      // Data do snapshot = dia 1 do mês corrente (um snapshot representa o mês).
+      const agora = new Date();
+      const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-01`;
+      // upsert por data: reimportar no mesmo dia substitui o snapshot do dia.
+      const { error: snapErr } = await supabase
+        .from("hs_historico")
+        .upsert({
+          data_snapshot: hoje,
+          verde: cont.Verde,
+          amarelo: cont.Amarelo,
+          vermelho: cont.Vermelho,
+          sem_nota: cont["N/A"],
+          total: linhasRede.length,
+        }, { onConflict: "data_snapshot" });
+      // Se o histórico falhar, não bloqueia a importação (os scores já foram gravados).
+      if (snapErr) console.warn("Não foi possível salvar o snapshot do histórico:", snapErr.message);
+
       setConcluido(true);
       setGravando(false);
       if (onConcluido) onConcluido(linhasRede.length, linhasCen.length);

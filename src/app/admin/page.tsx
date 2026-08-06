@@ -9,6 +9,7 @@ import AdminAnalytics from "@/components/AdminAnalytics";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
 import RankingCsm from "@/components/RankingCsm";
 import SaudeCarteira from "@/components/SaudeCarteira";
+import EvolucaoHealthScore from "@/components/EvolucaoHealthScore";
 import BuscaClientes from "@/components/BuscaClientes";
 import MenuLateral from "@/components/MenuLateral";
 
@@ -235,6 +236,9 @@ export default function AdminPage() {
 
             {/* Distribuição da carteira (cluster + operação lado a lado) */}
             <DistribuicaoCarteira />
+
+            {/* Evolução do Health Score (linha do tempo) */}
+            <EvolucaoHealthScore />
 
             {/* Health Score */}
             <SaudeCarteira />
