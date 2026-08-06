@@ -192,10 +192,13 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
       // Salva um snapshot mensal da distribuição por banda (histórico de evolução).
       // Conta as REDES por banda (mesma base do gráfico de Saúde da carteira).
       const cont = { Verde: 0, Amarelo: 0, Vermelho: 0, "N/A": 0 };
+      let somaScore = 0, nScore = 0;
       for (const r of linhasRede) {
         const b = (r.banda ?? "N/A") as keyof typeof cont;
         if (b in cont) cont[b]++; else cont["N/A"]++;
+        if (typeof r.score === "number") { somaScore += r.score; nScore++; }
       }
+      const notaMediaGeral = nScore > 0 ? Math.round((somaScore / nScore) * 10) / 10 : null;
       // Data do snapshot = dia 1 do mês corrente (um snapshot representa o mês).
       const agora = new Date();
       const hoje = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-01`;
@@ -209,6 +212,7 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
           vermelho: cont.Vermelho,
           sem_nota: cont["N/A"],
           total: linhasRede.length,
+          nota_media: notaMediaGeral,
         }, { onConflict: "data_snapshot" });
       // Se o histórico falhar, não bloqueia a importação (os scores já foram gravados).
       if (snapErr) console.warn("Não foi possível salvar o snapshot do histórico:", snapErr.message);
@@ -229,21 +233,23 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
           cf += 1000;
         }
 
-        const porCsm: Record<string, { Verde: number; Amarelo: number; Vermelho: number; total: number }> = {};
+        const porCsm: Record<string, { Verde: number; Amarelo: number; Vermelho: number; total: number; soma: number; n: number }> = {};
         for (const r of linhasRede) {
           const cod = (r.codigo_matriz ?? "").toString().trim();
           const csmId = cod ? csmPorCodigo[cod] : undefined;
           if (!csmId) continue;
           const banda = (r.banda ?? "") as "Verde" | "Amarelo" | "Vermelho";
-          if (!porCsm[csmId]) porCsm[csmId] = { Verde: 0, Amarelo: 0, Vermelho: 0, total: 0 };
+          if (!porCsm[csmId]) porCsm[csmId] = { Verde: 0, Amarelo: 0, Vermelho: 0, total: 0, soma: 0, n: 0 };
           if (banda === "Verde" || banda === "Amarelo" || banda === "Vermelho") {
             porCsm[csmId][banda]++;
             porCsm[csmId].total++;
           }
+          if (typeof r.score === "number") { porCsm[csmId].soma += r.score; porCsm[csmId].n++; }
         }
 
         const linhasCsm = Object.entries(porCsm).map(([csm_id, c]) => ({
           data_snapshot: hoje, csm_id, verde: c.Verde, amarelo: c.Amarelo, vermelho: c.Vermelho, total: c.total,
+          nota_media: c.n > 0 ? Math.round((c.soma / c.n) * 10) / 10 : null,
         }));
         if (linhasCsm.length > 0) {
           const { error: csmErr } = await supabase
@@ -253,6 +259,34 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
         }
       } catch (e) {
         console.warn("Falha no snapshot por CSM:", e);
+      }
+
+      // Snapshot POR OPERAÇÃO: agrupa as redes por operação (da própria planilha).
+      try {
+        const porOp: Record<string, { Verde: number; Amarelo: number; Vermelho: number; total: number; soma: number; n: number }> = {};
+        for (const r of linhasRede) {
+          const op = (r.operacao ?? "").toString().trim();
+          if (!op) continue;
+          const banda = (r.banda ?? "") as "Verde" | "Amarelo" | "Vermelho";
+          if (!porOp[op]) porOp[op] = { Verde: 0, Amarelo: 0, Vermelho: 0, total: 0, soma: 0, n: 0 };
+          if (banda === "Verde" || banda === "Amarelo" || banda === "Vermelho") {
+            porOp[op][banda]++;
+            porOp[op].total++;
+          }
+          if (typeof r.score === "number") { porOp[op].soma += r.score; porOp[op].n++; }
+        }
+        const linhasOp = Object.entries(porOp).map(([operacao, c]) => ({
+          data_snapshot: hoje, operacao, verde: c.Verde, amarelo: c.Amarelo, vermelho: c.Vermelho, total: c.total,
+          nota_media: c.n > 0 ? Math.round((c.soma / c.n) * 10) / 10 : null,
+        }));
+        if (linhasOp.length > 0) {
+          const { error: opErr } = await supabase
+            .from("hs_historico_operacao")
+            .upsert(linhasOp, { onConflict: "data_snapshot,operacao" });
+          if (opErr) console.warn("Não foi possível salvar o snapshot por operação:", opErr.message);
+        }
+      } catch (e) {
+        console.warn("Falha no snapshot por operação:", e);
       }
 
       setConcluido(true);

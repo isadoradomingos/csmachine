@@ -7,9 +7,9 @@ import type { UserRole } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import AdminAnalytics from "@/components/AdminAnalytics";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
-import RankingCsm from "@/components/RankingCsm";
-import SaudeCarteira from "@/components/SaudeCarteira";
 import EvolucaoHealthScore from "@/components/EvolucaoHealthScore";
+import SaudeCarteira from "@/components/SaudeCarteira";
+import RankingCsm from "@/components/RankingCsm";
 import BuscaClientes from "@/components/BuscaClientes";
 import MenuLateral from "@/components/MenuLateral";
 
@@ -237,10 +237,10 @@ export default function AdminPage() {
             {/* Distribuição da carteira (cluster + operação lado a lado) */}
             <DistribuicaoCarteira />
 
-            {/* Evolução do Health Score (linha do tempo) */}
+            {/* Evolução do Health Score */}
             <EvolucaoHealthScore />
 
-            {/* Health Score */}
+            {/* Saúde atual da carteira */}
             <SaudeCarteira />
           </div>
         )}
@@ -311,6 +311,7 @@ export default function AdminPage() {
             </div>
           </div>
         )}
+
       </main>
 
       {/* Modal convidar */}
