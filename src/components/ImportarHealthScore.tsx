@@ -213,6 +213,48 @@ export default function ImportarHealthScore({ onConcluido }: { onConcluido?: (re
       // Se o histórico falhar, não bloqueia a importação (os scores já foram gravados).
       if (snapErr) console.warn("Não foi possível salvar o snapshot do histórico:", snapErr.message);
 
+      // Snapshot POR CSM: casa cada rede (codigo_matriz) com o cliente/CSM dono.
+      try {
+        const csmPorCodigo: Record<string, string> = {};
+        let cf = 0;
+        for (;;) {
+          const { data, error } = await supabase
+            .from("clients").select("bandeira, csm_id").eq("status", "ativo").range(cf, cf + 999);
+          if (error || !data || data.length === 0) break;
+          for (const c of data as { bandeira: string | null; csm_id: string | null }[]) {
+            const b = (c.bandeira ?? "").trim();
+            if (b && c.csm_id) csmPorCodigo[b] = c.csm_id;
+          }
+          if (data.length < 1000) break;
+          cf += 1000;
+        }
+
+        const porCsm: Record<string, { Verde: number; Amarelo: number; Vermelho: number; total: number }> = {};
+        for (const r of linhasRede) {
+          const cod = (r.codigo_matriz ?? "").toString().trim();
+          const csmId = cod ? csmPorCodigo[cod] : undefined;
+          if (!csmId) continue;
+          const banda = (r.banda ?? "") as "Verde" | "Amarelo" | "Vermelho";
+          if (!porCsm[csmId]) porCsm[csmId] = { Verde: 0, Amarelo: 0, Vermelho: 0, total: 0 };
+          if (banda === "Verde" || banda === "Amarelo" || banda === "Vermelho") {
+            porCsm[csmId][banda]++;
+            porCsm[csmId].total++;
+          }
+        }
+
+        const linhasCsm = Object.entries(porCsm).map(([csm_id, c]) => ({
+          data_snapshot: hoje, csm_id, verde: c.Verde, amarelo: c.Amarelo, vermelho: c.Vermelho, total: c.total,
+        }));
+        if (linhasCsm.length > 0) {
+          const { error: csmErr } = await supabase
+            .from("hs_historico_csm")
+            .upsert(linhasCsm, { onConflict: "data_snapshot,csm_id" });
+          if (csmErr) console.warn("Não foi possível salvar o snapshot por CSM:", csmErr.message);
+        }
+      } catch (e) {
+        console.warn("Falha no snapshot por CSM:", e);
+      }
+
       setConcluido(true);
       setGravando(false);
       if (onConcluido) onConcluido(linhasRede.length, linhasCen.length);
