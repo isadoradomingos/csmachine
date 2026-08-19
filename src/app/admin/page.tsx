@@ -176,6 +176,32 @@ export default function AdminPage() {
     await load();
   }
 
+  async function handleDeleteUser() {
+    if (!editUser) return;
+    const ok = confirm(
+      `Excluir ${editUser.full_name} permanentemente? Essa ação não pode ser desfeita: o acesso e o perfil são apagados de vez, e os clientes dele ficarão sem CSM.`
+    );
+    if (!ok) return;
+
+    setSavingEdit(true);
+    const res = await fetch("/api/delete-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: editUser.id }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error ?? "Erro ao excluir usuário");
+      setSavingEdit(false);
+      return;
+    }
+
+    setSavingEdit(false);
+    setEditUser(null);
+    await load();
+  }
+
   async function handleToggleAtivo(desativar: boolean) {
     if (!editUser) return;
     const id = editUser.id;
@@ -448,7 +474,7 @@ export default function AdminPage() {
                   {savingEdit ? "Salvando..." : "Salvar"}
                 </button>
               </div>
-              <div className="pt-2 border-t border-gray-100">
+              <div className="pt-2 border-t border-gray-100 space-y-2">
                 {editUser.ativo !== false ? (
                   <button type="button" onClick={() => handleToggleAtivo(true)} className="w-full rounded-lg border border-red-200 text-red-500 px-4 py-2 text-sm hover:bg-red-50 transition-colors">
                     Desativar usuário
@@ -458,6 +484,9 @@ export default function AdminPage() {
                     Reativar usuário
                   </button>
                 )}
+                <button type="button" onClick={handleDeleteUser} disabled={savingEdit} className="w-full rounded-lg bg-red-600 text-white px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors">
+                  Excluir usuário permanentemente
+                </button>
               </div>
             </form>
           </div>

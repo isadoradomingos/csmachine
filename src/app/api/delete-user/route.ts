@@ -20,6 +20,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Limpa o que ficaria órfão: papéis, atribuição de clientes e o perfil.
+    await supabaseAdmin.from("user_roles").delete().eq("user_id", user_id);
+    await supabaseAdmin.from("clients").update({ csm_id: null }).eq("csm_id", user_id);
+    await supabaseAdmin.from("profiles").delete().eq("id", user_id);
+
     return NextResponse.json({ success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erro inesperado";
