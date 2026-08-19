@@ -25,6 +25,9 @@ export default function UsuariosPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", monthly_goal: 49 });
   const [saving, setSaving] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<"idle" | "success" | "error">("idle");
+  const [resendError, setResendError] = useState("");
 
   async function loadUsers() {
     const { data: profiles } = await supabase
@@ -102,6 +105,31 @@ export default function UsuariosPage() {
     await loadUsers();
   }
 
+  async function handleResendInvite() {
+    if (!editingUser) return;
+    setResending(true);
+    setResendStatus("idle");
+    setResendError("");
+
+    const res = await fetch("/api/resend-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: editingUser.id }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setResendStatus("error");
+      setResendError(data.error ?? "Erro ao reenviar e-mail");
+      setResending(false);
+      return;
+    }
+
+    setResendStatus("success");
+    setResending(false);
+  }
+
   async function handleDelete(user: User) {
     if (!confirm(`Tem certeza que deseja remover o acesso de ${user.full_name}?`)) return;
 
@@ -170,7 +198,7 @@ export default function UsuariosPage() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <button
-                    onClick={() => { setEditingUser(user); setEditForm({ full_name: user.full_name, monthly_goal: user.monthly_goal ?? 49 }); }}
+                    onClick={() => { setEditingUser(user); setEditForm({ full_name: user.full_name, monthly_goal: user.monthly_goal ?? 49 }); setResendStatus("idle"); setResendError(""); }}
                     className="text-xs text-blue-500 hover:text-blue-700"
                   >
                     Editar
@@ -252,6 +280,27 @@ export default function UsuariosPage() {
                 <label className="block text-xs font-medium text-gray-600 mb-1">Meta mensal de contatos</label>
                 <input type="number" value={editForm.monthly_goal} onChange={e => setEditForm({ ...editForm, monthly_goal: parseInt(e.target.value) })} required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
+
+              <div className="rounded-lg border border-gray-200 px-3 py-2.5 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-gray-700">E-mail de acesso</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {resendStatus === "success" ? "E-mail reenviado!" : "Reenvia o convite ou o link de redefinição de senha."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResendInvite}
+                  disabled={resending}
+                  className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 shrink-0"
+                >
+                  {resending ? "Enviando..." : "Reenviar e-mail"}
+                </button>
+              </div>
+              {resendStatus === "error" && (
+                <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{resendError}</p>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setEditingUser(null)} className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
                 <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
