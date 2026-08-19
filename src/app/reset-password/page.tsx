@@ -12,16 +12,29 @@ export default function ResetPasswordPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
+  const [linkInvalido, setLinkInvalido] = useState(false);
 
   useEffect(() => {
-    // O Supabase processa o token da URL automaticamente
+    // O Supabase processa o token da URL automaticamente.
+    // Link de "esqueci a senha" dispara PASSWORD_RECOVERY; link de convite de usuário novo dispara SIGNED_IN.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setReady(true);
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Se nada acontecer em alguns segundos, o link provavelmente é inválido ou expirou.
+    const timeout = setTimeout(() => {
+      setReady(prevReady => {
+        if (!prevReady) setLinkInvalido(true);
+        return prevReady;
+      });
+    }, 8000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -87,6 +100,11 @@ export default function ResetPasswordPage() {
               <div style={{ fontSize: 40, marginBottom: 16 }}>✓</div>
               <h2 style={{ fontSize: 20, fontWeight: 700, color: "#111", marginBottom: 8 }}>Senha redefinida!</h2>
               <p style={{ fontSize: 14, color: "#aaa" }}>Você será redirecionado para o login em instantes...</p>
+            </div>
+          ) : linkInvalido ? (
+            <div style={{ textAlign: "center", padding: "16px 0" }}>
+              <p style={{ fontSize: 14, color: "#E53935", marginBottom: 12 }}>Este link é inválido ou já expirou.</p>
+              <p style={{ fontSize: 13, color: "#aaa" }}>Peça para gerarem um novo link de acesso para você.</p>
             </div>
           ) : !ready ? (
             <div style={{ textAlign: "center", padding: "16px 0" }}>
