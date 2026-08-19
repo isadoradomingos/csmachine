@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { operacaoLabel } from "@/lib/labels";
 
 type ClienteBusca = {
   id: string;
@@ -90,7 +91,7 @@ export default function BuscaClientes() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{c.marca}</p>
                   <p className="text-xs text-gray-400 truncate">
-                    {[c.operacao, c.cluster, c.plano].filter(Boolean).join(" · ") || "—"}
+                    {[operacaoLabel(c.operacao), c.cluster, c.plano].filter(Boolean).join(" · ") || "—"}
                     {c.status && c.status !== "ativo" ? ` · ${c.status}` : ""}
                   </p>
                 </div>

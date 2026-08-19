@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import type { Profile, Client } from "@/lib/types";
+import { operacaoLabel } from "@/lib/labels";
 import { useRouter, useSearchParams } from "next/navigation";
 import DistribuicaoCarteira from "@/components/DistribuicaoCarteira";
 import EvolucaoHealthScore from "@/components/EvolucaoHealthScore";
@@ -458,10 +459,10 @@ function DashboardInner() {
                 <div className="fixed inset-0 z-30" onClick={() => setShowFiltros(false)} />
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl border border-slate-200 shadow-lg z-40 p-4 space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Operação</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Serviço</label>
                     <select value={rascunho.operacao} onChange={e => setRascunho({ ...rascunho, operacao: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                       <option value="">Todas</option>
-                      <option value="Corridas">Corridas</option>
+                      <option value="Corridas">Mobilidade</option>
                       <option value="Entregas">Entregas</option>
                       <option value="Mototáxi">Mototáxi</option>
                       <option value="Táxi">Táxi</option>
@@ -549,7 +550,7 @@ function DashboardInner() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-gray-900 truncate">{c.marca}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${operacaoColor[c.operacao] ?? "bg-gray-100 text-gray-600"}`}>
-                          {c.operacao}
+                          {operacaoLabel(c.operacao)}
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">

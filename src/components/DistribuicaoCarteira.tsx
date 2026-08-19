@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { OPERACAO_LABEL } from "@/lib/labels";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -12,7 +13,6 @@ type Fatia = { nome: string; valor: number; chave: string };
 type ClienteMin = { id: string; marca: string; csm_nome: string };
 
 const CLUSTER_LABEL: Record<string, string> = { A: "A", B: "B", C: "C", D: "D" };
-const OPERACAO_LABEL: Record<string, string> = {};
 
 const CORES_CLUSTER = ["#2563eb", "#8b5cf6", "#f59e0b", "#64748b", "#ec4899", "#14b8a6"];
 const CORES_OPERACAO = ["#2563eb", "#16a34a", "#f59e0b", "#a855f7"];
@@ -133,12 +133,12 @@ export default function DistribuicaoCarteira() {
 
       {/* Por operação (barras) */}
       <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
-        <p className="text-sm font-medium text-gray-700 mb-1">Carteira por operação</p>
-        <p className="text-xs text-gray-400 mb-4">Distribuição dos {total} clientes ativos por tipo de operação · clique para ver a lista</p>
+        <p className="text-sm font-medium text-gray-700 mb-1">Carteira por serviço</p>
+        <p className="text-xs text-gray-400 mb-4">Distribuição dos {total} clientes ativos por tipo de serviço · clique para ver a lista</p>
         {carregando ? (
           <div className="h-64 animate-pulse rounded-xl bg-slate-50 dark:bg-slate-100" />
         ) : porOperacao.length === 0 ? (
-          <p className="text-sm text-gray-400 py-16 text-center">Sem dados de operação.</p>
+          <p className="text-sm text-gray-400 py-16 text-center">Sem dados de serviço.</p>
         ) : (
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={porOperacao} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>

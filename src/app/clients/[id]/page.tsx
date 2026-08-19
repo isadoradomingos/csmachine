@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import type { Client } from "@/lib/types";
+import { operacaoLabel } from "@/lib/labels";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { SeletorPercepcao, EtiquetaPercepcao, type Percepcao } from "@/components/Percepcao";
 import MenuLateral from "@/components/MenuLateral";
@@ -687,7 +688,7 @@ export default function ClientPage() {
                 <h2 className="text-2xl font-semibold text-gray-900">{client.marca}</h2>
                 {client.operacao && (
                   <span className={`text-xs px-2 py-1 rounded-full font-medium ${operacaoColor[client.operacao] ?? "bg-gray-100 text-gray-600"}`}>
-                    {client.operacao}
+                    {operacaoLabel(client.operacao)}
                   </span>
                 )}
                 {client.plano && (
@@ -747,8 +748,8 @@ export default function ClientPage() {
                 <dd className="text-sm font-medium text-gray-900">{client.plano ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-xs text-gray-400 mb-1">Operação</dt>
-                <dd className="text-sm font-medium text-gray-900">{client.operacao ?? "—"}</dd>
+                <dt className="text-xs text-gray-400 mb-1">Serviço</dt>
+                <dd className="text-sm font-medium text-gray-900">{client.operacao ? operacaoLabel(client.operacao) : "—"}</dd>
               </div>
               <div>
                 <dt className="text-xs text-gray-400 mb-1">Marca</dt>
@@ -802,10 +803,10 @@ export default function ClientPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Operação</label>
+                <label className="block text-xs text-gray-400 mb-1">Serviço</label>
                 <select value={infoForm.operacao} onChange={e => setInfoForm({ ...infoForm, operacao: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">—</option>
-                  {["Corridas", "Entregas", "Mototáxi", "Táxi"].map(o => <option key={o} value={o}>{o}</option>)}
+                  {["Corridas", "Entregas", "Mototáxi", "Táxi"].map(o => <option key={o} value={o}>{operacaoLabel(o)}</option>)}
                 </select>
               </div>
               <div>
@@ -970,7 +971,7 @@ export default function ClientPage() {
                           <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
                               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Health Score da marca</p>
-                              <p className="text-sm text-gray-500 mt-0.5">{healthScore.rede} · {healthScore.operacao}</p>
+                              <p className="text-sm text-gray-500 mt-0.5">{healthScore.rede} · {operacaoLabel(healthScore.operacao)}</p>
                               <div className="flex items-center gap-3 mt-2 flex-wrap">
                                 {healthScore.n_centrais !== null && (
                                   <span className="text-xs text-gray-500">{healthScore.n_centrais} {healthScore.n_centrais === 1 ? "central" : "centrais"}</span>

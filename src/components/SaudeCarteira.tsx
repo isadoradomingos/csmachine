@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { operacaoLabel } from "@/lib/labels";
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend,
 } from "recharts";
@@ -283,7 +284,7 @@ export default function SaudeCarteira() {
                         <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: cor }} />
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{r.rede}</p>
-                          <p className="text-xs text-gray-400">{r.operacao}</p>
+                          <p className="text-xs text-gray-400">{operacaoLabel(r.operacao)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">

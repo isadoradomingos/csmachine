@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
+import { operacaoLabel } from "@/lib/labels";
 import {
   ResponsiveContainer, ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
@@ -102,7 +103,7 @@ export default function EvolucaoHealthScore() {
   const temFiltro = !!(filtroCsm || filtroOperacao);
   const rotuloCategoria = filtroCsm
     ? `Média ${csms.find(c => c.id === filtroCsm)?.nome ?? "CSM"}`
-    : filtroOperacao ? `Média ${filtroOperacao}` : "";
+    : filtroOperacao ? `Média ${operacaoLabel(filtroOperacao)}` : "";
 
   // mapa data -> nota_media geral (para a linha de referência sempre presente)
   const notaGeralPorData = useMemo(() => {
@@ -153,8 +154,8 @@ export default function EvolucaoHealthScore() {
           )}
           {operacoes.length > 0 && (
             <select value={filtroOperacao} onChange={e => escolherOperacao(e.target.value)} className={selectCls}>
-              <option value="">Todas as operações</option>
-              {operacoes.map(o => <option key={o} value={o}>{o}</option>)}
+              <option value="">Todos os serviços</option>
+              {operacoes.map(o => <option key={o} value={o}>{operacaoLabel(o)}</option>)}
             </select>
           )}
         </div>
