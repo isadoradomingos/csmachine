@@ -30,6 +30,9 @@ export default function AdminPage() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState({ full_name: "", email: "", monthly_goal: 49, hasMeta: true, role: "csm" });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState<"idle" | "success" | "error">("idle");
+  const [resendError, setResendError] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteStatus, setInviteStatus] = useState<"idle" | "success" | "error">("idle");
   const [inviteError, setInviteError] = useState("");
@@ -108,6 +111,32 @@ export default function AdminPage() {
       role: roleCombo,
     });
     setEditUser(u);
+    setResendStatus("idle");
+    setResendError("");
+  }
+
+  async function handleResendInvite() {
+    if (!editUser) return;
+    setResending(true);
+    setResendStatus("idle");
+    setResendError("");
+
+    const res = await fetch("/api/resend-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: editUser.id }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setResendStatus("error");
+      setResendError(data.error ?? "Erro ao reenviar e-mail");
+      setResending(false);
+      return;
+    }
+
+    setResendStatus("success");
+    setResending(false);
   }
 
   async function handleSaveEdit(e: React.FormEvent) {
@@ -379,6 +408,22 @@ export default function AdminPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">E-mail</label>
                 <input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} required className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <div className="flex items-center justify-between gap-3 mt-2">
+                  <p className="text-xs text-gray-400">
+                    {resendStatus === "success" ? "E-mail reenviado!" : "Reenvia o convite ou o link de redefinição de senha."}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResendInvite}
+                    disabled={resending}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 shrink-0"
+                  >
+                    {resending ? "Enviando..." : "Reenviar e-mail"}
+                  </button>
+                </div>
+                {resendStatus === "error" && (
+                  <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-2">{resendError}</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Perfil</label>
