@@ -171,7 +171,7 @@ export default function SaudeCarteira() {
         <div>
           <p className="text-sm font-medium text-gray-700">Saúde da carteira (Health Score)</p>
           <p className="text-xs text-gray-400">
-            Distribuição das redes por banda de risco
+            Distribuição das marcas por banda de risco
             {ultimo ? ` · atualizado em ${new Date(ultimo).toLocaleDateString("pt-BR")}` : ""}
           </p>
         </div>
@@ -226,7 +226,7 @@ export default function SaudeCarteira() {
             </ResponsiveContainer>
             <div className="text-center shrink-0 sm:pr-6">
               <p className="text-3xl font-semibold text-gray-900">{redesDoCsm.length}</p>
-              <p className="text-xs text-gray-400">redes avaliadas</p>
+              <p className="text-xs text-gray-400">marcas avaliadas</p>
             </div>
           </div>
 
@@ -256,18 +256,18 @@ export default function SaudeCarteira() {
             <input
               value={busca}
               onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar rede por nome..."
+              placeholder="Buscar marca por nome..."
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
 
             <p className="text-xs text-gray-400 mt-2">
-              {redesFiltradas.length} {redesFiltradas.length === 1 ? "rede" : "redes"}
+              {redesFiltradas.length} {redesFiltradas.length === 1 ? "marca" : "marcas"}
               {filtroBanda ? ` · ${ROTULO_CURTO[filtroBanda]}` : ""}
             </p>
 
             <ul className="mt-2 divide-y divide-slate-200/60 max-h-96 overflow-y-auto rounded-lg border border-slate-200/60">
               {redesFiltradas.length === 0 ? (
-                <li className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma rede encontrada.</li>
+                <li className="px-4 py-6 text-center text-sm text-gray-400">Nenhuma marca encontrada.</li>
               ) : redesFiltradas.map((r, i) => {
                 const cor = CORES[r.banda];
                 const clientId = r.codigo_matriz ? clientesPorNome[String(r.codigo_matriz).trim()] ?? null : null;

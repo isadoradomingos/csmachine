@@ -86,12 +86,12 @@ export default function HealthScorePage() {
         ) : resumoRede ? (
           <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-6">
             <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
-              <p className="text-sm font-medium text-gray-700">Distribuição das redes por banda</p>
+              <p className="text-sm font-medium text-gray-700">Distribuição das marcas por banda</p>
               {ultimaImportacao && (
                 <p className="text-xs text-gray-400">Importado em {new Date(ultimaImportacao).toLocaleString("pt-BR")}</p>
               )}
             </div>
-            <p className="text-xs text-gray-400 mb-4">{totalRedes} redes classificadas</p>
+            <p className="text-xs text-gray-400 mb-4">{totalRedes} marcas classificadas</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {(["Verde", "Amarelo", "Vermelho", "N/A"] as const).map(b => {
                 const qtd = resumoRede[b];

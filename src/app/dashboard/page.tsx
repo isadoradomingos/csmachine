@@ -434,7 +434,7 @@ function DashboardInner() {
 
         {/* Busca e filtros */}
         <div className="flex flex-wrap gap-3 mb-4">
-          <input type="text" placeholder="Buscar por nome ou bandeira..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <input type="text" placeholder="Buscar por nome ou central..." value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-[200px] rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <div className="relative">
             <button
               onClick={() => {
@@ -553,7 +553,7 @@ function DashboardInner() {
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        Bandeira {c.bandeira}
+                        Código da Central {c.bandeira}
                         {c.cluster ? ` · ${clusterLabel[c.cluster] ?? c.cluster}` : ""}
                         {c.plano ? ` · ${c.plano.charAt(0).toUpperCase() + c.plano.slice(1)}` : ""}
                       </p>
@@ -635,7 +635,7 @@ function DashboardInner() {
 
             {/* Filtros do modal */}
             <div className="px-6 py-3 border-b border-gray-100 space-y-2">
-              <input type="text" placeholder="Buscar por nome ou bandeira..." value={modalSearch} onChange={e => setModalSearch(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="text" placeholder="Buscar por nome ou central..." value={modalSearch} onChange={e => setModalSearch(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <div className="flex gap-2 flex-wrap">
                 <select value={modalOrder} onChange={e => setModalOrder(e.target.value as "asc" | "desc")} className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs bg-white focus:outline-none">
                   <option value="desc">Mais antigos primeiro</option>
@@ -663,7 +663,7 @@ function DashboardInner() {
                     <div>
                       <p className="font-medium text-gray-900 text-sm">{c.marca}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        Bandeira {c.bandeira} · sem contato há {c.daysSinceContact === 999 ? "—" : `${c.daysSinceContact} dias`}
+                        Código da Central {c.bandeira} · sem contato há {c.daysSinceContact === 999 ? "—" : `${c.daysSinceContact} dias`}
                       </p>
                     </div>
                     <span className="text-xs text-gray-400">→</span>
@@ -695,7 +695,7 @@ function DashboardInner() {
                     <div>
                       <p className="font-medium text-gray-900 text-sm">{c.marca}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        Bandeira {c.bandeira} · {c.tentativasSemRetorno} tentativas de contato sem retorno
+                        Código da Central {c.bandeira} · {c.tentativasSemRetorno} tentativas de contato sem retorno
                       </p>
                     </div>
                     <span className="text-xs text-gray-400">→</span>
@@ -760,7 +760,7 @@ function DashboardInner() {
                       <div>
                         <p className="font-medium text-gray-900 text-sm">{cliente?.marca}</p>
                         <p className="text-xs text-gray-400 mt-0.5">
-                          Bandeira {cliente?.bandeira} · consultoria em {new Date(c.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                          Código da Central {cliente?.bandeira} · consultoria em {new Date(c.date + "T00:00:00").toLocaleDateString("pt-BR")}
                         </p>
                       </div>
                       <span className="text-xs text-gray-400">→</span>

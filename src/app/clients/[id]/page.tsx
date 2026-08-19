@@ -45,6 +45,12 @@ type AuditLog = {
   profiles: { full_name: string };
 };
 
+// Rótulo de exibição para tipo_central — o valor gravado no banco continua "Matriz" | "Filial".
+const TIPO_CENTRAL_LABEL: Record<string, string> = {
+  Matriz: "Central Principal",
+  Filial: "Central Associada",
+};
+
 function escapeHtml(text: string) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -700,7 +706,7 @@ export default function ClientPage() {
                   <EtiquetaPercepcao value={percepcaoAtual.percepcao as Percepcao} data={percepcaoAtual.date} />
                 )}
               </div>
-              <p className="text-sm text-gray-400 mt-1">Bandeira {client.bandeira}</p>
+              <p className="text-sm text-gray-400 mt-1">Código da Central {client.bandeira}</p>
             </div>
             <span className={`text-xs px-3 py-1 rounded-full font-medium ${
               client.status === "ativo" ? "bg-green-100 text-green-700" :
@@ -745,7 +751,7 @@ export default function ClientPage() {
                 <dd className="text-sm font-medium text-gray-900">{client.operacao ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-xs text-gray-400 mb-1">Rede</dt>
+                <dt className="text-xs text-gray-400 mb-1">Marca</dt>
                 <dd className="text-sm font-medium text-gray-900">{client.rede ?? "—"}</dd>
               </div>
               <div>
@@ -803,7 +809,7 @@ export default function ClientPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs text-gray-400 mb-1">Rede</label>
+                <label className="block text-xs text-gray-400 mb-1">Marca</label>
                 <input value={infoForm.rede} onChange={e => setInfoForm({ ...infoForm, rede: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
@@ -947,7 +953,7 @@ export default function ClientPage() {
                   <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-8 text-center">
                     <p className="text-sm font-medium text-gray-500">Sem health score para este cliente</p>
                     <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">
-                      Não encontramos uma rede correspondente a <span className="font-medium">{client.marca}</span> nos
+                      Não encontramos uma marca correspondente a <span className="font-medium">{client.marca}</span> nos
                       dados do Health Score. Isso pode acontecer se o nome não casou com os dados importados ou se ainda
                       não há dados para esta central.
                     </p>
@@ -963,7 +969,7 @@ export default function ClientPage() {
                         <div className="rounded-2xl border p-6" style={{ borderColor: cor + "55", background: fundo }}>
                           <div className="flex items-center justify-between flex-wrap gap-4">
                             <div>
-                              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Health Score da rede</p>
+                              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Health Score da marca</p>
                               <p className="text-sm text-gray-500 mt-0.5">{healthScore.rede} · {healthScore.operacao}</p>
                               <div className="flex items-center gap-3 mt-2 flex-wrap">
                                 {healthScore.n_centrais !== null && (
@@ -992,10 +998,10 @@ export default function ClientPage() {
                     {/* Lista de centrais da rede (matriz + filiais), expansível */}
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">
-                        Centrais da rede {centraisRede.length > 0 ? `(${centraisRede.length})` : ""}
+                        Centrais da marca {centraisRede.length > 0 ? `(${centraisRede.length})` : ""}
                       </p>
                       {centraisRede.length === 0 ? (
-                        <p className="text-sm text-gray-400">Nenhuma central detalhada encontrada para esta rede.</p>
+                        <p className="text-sm text-gray-400">Nenhuma central detalhada encontrada para esta marca.</p>
                       ) : (
                         <div className="space-y-2">
                           {centraisRede.map(central => {
@@ -1016,7 +1022,7 @@ export default function ClientPage() {
                                         {central.nome}
                                         {ehCliente && <span className="ml-2 text-xs text-blue-600 font-normal">(este cliente)</span>}
                                       </p>
-                                      <p className="text-xs text-gray-400">{central.tipo_central ?? ""}{central.status && central.status !== "ATIVA" ? ` · ${central.status}` : ""}</p>
+                                      <p className="text-xs text-gray-400">{central.tipo_central ? TIPO_CENTRAL_LABEL[central.tipo_central] ?? central.tipo_central : ""}{central.status && central.status !== "ATIVA" ? ` · ${central.status}` : ""}</p>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-3 shrink-0">

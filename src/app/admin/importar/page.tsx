@@ -445,7 +445,7 @@ export default function ImportarPage() {
             Planilha de distribuição (.xlsx) com a aba <span className="font-medium">DIVISÃO</span>, contendo as colunas:
             Código, Central, Responsável, Serviço, Plano, Status, ABCD, Rede, Tipo de central,
             Cidade registrada, Carteira?, e os dados de contato (Nome Representante Legal, Telefone, E-mail).
-            O casamento é feito pelo <span className="font-medium">Código</span> (= bandeira do cliente).
+            O casamento é feito pelo <span className="font-medium">Código</span> (= código da central do cliente).
           </p>
         </div>
 
@@ -481,13 +481,13 @@ export default function ImportarPage() {
                 </div>
               </div>
               <div className="px-6 py-3 border-b border-slate-200/60">
-                <input type="text" placeholder="Buscar por marca ou bandeira..." value={buscaPrevia} onChange={e => setBuscaPrevia(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="text" placeholder="Buscar por marca ou central..." value={buscaPrevia} onChange={e => setBuscaPrevia(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <ul className="divide-y divide-slate-200/60 max-h-72 overflow-y-auto">
                 {rowsFiltradas.map((r, i) => (
                   <li key={i} className="px-6 py-3 flex items-center justify-between text-sm">
                     <div>
-                      <span className="font-medium text-gray-900">Bandeira {r.bandeira}</span>
+                      <span className="font-medium text-gray-900">Código da Central {r.bandeira}</span>
                       {r.marca && <span className="text-gray-400 ml-2">· {r.marca}</span>}
                       {r.csm && <span className="text-gray-400 ml-2">· {r.csm}</span>}
                       {r.motivo && <span className="text-gray-400 ml-2">· {r.motivo}</span>}
@@ -522,7 +522,7 @@ export default function ImportarPage() {
                     <span className="text-gray-400 ml-auto">{selecionados.size} selecionado(s)</span>
                   </div>
                   <div className="px-6 py-3 border-b border-slate-200/60">
-                    <input type="text" placeholder="Buscar por marca ou bandeira..." value={buscaAusentes} onChange={e => setBuscaAusentes(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input type="text" placeholder="Buscar por marca ou central..." value={buscaAusentes} onChange={e => setBuscaAusentes(e.target.value)} className="w-full rounded-lg border border-slate-200 bg-white dark:bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <ul className="divide-y divide-slate-200/60 max-h-72 overflow-y-auto">
                     {ausentesFiltrados.length === 0 ? (
@@ -532,7 +532,7 @@ export default function ImportarPage() {
                         <input type="checkbox" checked={selecionados.has(c.id)} onChange={() => toggleSel(c.id)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 shrink-0" />
                         <div className="min-w-0 flex-1">
                           <span className="font-medium text-gray-900">{c.marca}</span>
-                          <span className="text-gray-400 ml-2">Bandeira {c.bandeira ?? "—"}</span>
+                          <span className="text-gray-400 ml-2">Código da Central {c.bandeira ?? "—"}</span>
                           <span className="text-gray-400 ml-2">· {c.csm_nome}</span>
                         </div>
                         <span className={`text-xs shrink-0 ${c.diasSemContato > 60 ? "text-amber-600" : "text-gray-400"}`}>
@@ -578,7 +578,7 @@ export default function ImportarPage() {
               {rows.map((r, i) => (
                 <li key={i} className="px-6 py-3 flex items-center justify-between text-sm">
                   <div>
-                    <span className="font-medium text-gray-900">Bandeira {r.bandeira}</span>
+                    <span className="font-medium text-gray-900">Código da Central {r.bandeira}</span>
                     {r.marca && <span className="text-gray-400 ml-2">· {r.marca}</span>}
                     {r.message && <span className="text-gray-400 ml-2">· {r.message}</span>}
                   </div>

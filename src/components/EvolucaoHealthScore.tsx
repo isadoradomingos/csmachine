@@ -142,7 +142,7 @@ export default function EvolucaoHealthScore() {
       <div className="flex items-start justify-between gap-4 flex-wrap mb-1">
         <div>
           <p className="text-sm font-medium text-gray-700">Evolução do Health Score</p>
-          <p className="text-xs text-gray-400">Distribuição das redes por banda e nota média ao longo dos meses</p>
+          <p className="text-xs text-gray-400">Distribuição das marcas por banda e nota média ao longo dos meses</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {csms.length > 0 && (

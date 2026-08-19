@@ -64,7 +64,7 @@ export default function BuscaClientes() {
   return (
     <div className="bg-white dark:bg-slate-50 rounded-2xl border border-slate-200/80 shadow-sm p-5">
       <p className="text-sm font-medium text-gray-700 mb-1">Buscar cliente</p>
-      <p className="text-xs text-gray-400 mb-3">Pesquise por nome ou bandeira e abra a ficha completa do cliente</p>
+      <p className="text-xs text-gray-400 mb-3">Pesquise por nome ou central e abra a ficha completa do cliente</p>
 
       <input
         value={busca}
