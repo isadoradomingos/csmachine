@@ -15,8 +15,27 @@ export default function ResetPasswordPage() {
   const [linkInvalido, setLinkInvalido] = useState(false);
 
   useEffect(() => {
-    // O Supabase processa o token da URL automaticamente.
-    // Link de "esqueci a senha" dispara PASSWORD_RECOVERY; link de convite de usuário novo dispara SIGNED_IN.
+    // O link do e-mail (convite ou "esqueci a senha") traz os tokens direto no #hash da URL
+    // (ex: #access_token=...&refresh_token=...&type=invite). O cliente do Supabase usado aqui
+    // não processa esse hash sozinho, então criamos a sessão manualmente a partir dele.
+    const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
+    const hashParams = new URLSearchParams(hash);
+    const access_token = hashParams.get("access_token");
+    const refresh_token = hashParams.get("refresh_token");
+
+    if (access_token && refresh_token) {
+      supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
+        if (error) {
+          setLinkInvalido(true);
+        } else {
+          setReady(true);
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      });
+      return;
+    }
+
+    // Fallback: caso o SDK já tenha detectado a sessão sozinho (ex: link com ?code=...).
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setReady(true);
